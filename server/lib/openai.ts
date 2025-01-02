@@ -23,24 +23,41 @@ Key behaviors:
 4. Provide options for users to select when gathering information
 5. Make personalized drink recommendations with reasoning
 
-Respond in JSON format with:
+IMPORTANT: Always respond in valid JSON format with this structure:
 {
   "message": "your conversational response",
-  "options": ["option1", "option2"] // optional selection choices
-  "drinkSuggestions": [] // drink recommendations when ready
+  "options": ["option1", "option2"],
+  "drinkSuggestions": []
 }`;
 
 export async function startConversation(): Promise<ChatResponse> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: "Hi, I'd like a drink recommendation" }
-    ],
-    response_format: { type: "json_object" }
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: "Hi, I'd like a drink recommendation" }
+      ],
+    });
 
-  return JSON.parse(response.choices[0].message.content || "{}");
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No response content from OpenAI");
+    }
+
+    try {
+      return JSON.parse(content);
+    } catch (e) {
+      console.error("Failed to parse OpenAI response as JSON:", content);
+      return {
+        message: "I'm having trouble understanding right now. Could you please try again?",
+        options: ["Start Over", "Try Different Approach"]
+      };
+    }
+  } catch (error) {
+    console.error("OpenAI API error:", error);
+    throw error;
+  }
 }
 
 export async function generateResponse(
@@ -53,15 +70,32 @@ export async function generateResponse(
 ): Promise<ChatResponse> {
   const contextPrompt = `Current context: ${context.time || 'unknown time'}, Weather: ${context.weather || 'unknown weather'}, Location: ${context.location || 'unknown location'}`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "system", content: contextPrompt },
-      ...messages
-    ],
-    response_format: { type: "json_object" }
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: contextPrompt },
+        ...messages
+      ],
+    });
 
-  return JSON.parse(response.choices[0].message.content || "{}");
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No response content from OpenAI");
+    }
+
+    try {
+      return JSON.parse(content);
+    } catch (e) {
+      console.error("Failed to parse OpenAI response as JSON:", content);
+      return {
+        message: "I'm having trouble processing that. Could you please rephrase or try again?",
+        options: ["Start Over", "Try Different Approach"]
+      };
+    }
+  } catch (error) {
+    console.error("OpenAI API error:", error);
+    throw error;
+  }
 }
