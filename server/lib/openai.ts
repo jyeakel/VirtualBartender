@@ -32,6 +32,7 @@ IMPORTANT: Always respond in valid JSON format with this structure:
 
 export async function startConversation(): Promise<ChatResponse> {
   try {
+    console.log('Starting OpenAI conversation...');
     const response = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
@@ -46,6 +47,7 @@ export async function startConversation(): Promise<ChatResponse> {
     }
 
     try {
+      console.log('Parsing OpenAI response:', content);
       return JSON.parse(content);
     } catch (e) {
       console.error("Failed to parse OpenAI response as JSON:", content);

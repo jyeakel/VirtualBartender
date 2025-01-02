@@ -9,10 +9,12 @@ const router = Router();
 
 router.post('/start', async (req, res) => {
   try {
+    console.log('Starting new chat session...');
     const sessionId = uuidv4();
 
     // Start chat session
     const response = await startConversation();
+    console.log('OpenAI response:', response);
 
     // Store session
     await db.insert(chatSessions).values({
