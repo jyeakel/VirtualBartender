@@ -13,7 +13,13 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   options?: string[];
-  recommendations?: any[];
+  recommendations?: {
+    id: number;
+    name: string;
+    description: string;
+    ingredients: { name: string; amount: string }[];
+    imageUrl?: string;
+  }[];
 };
 
 export default function ChatInterface() {
@@ -21,16 +27,30 @@ export default function ChatInterface() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  
+
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("http://localhost:8000/api/chat/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRFToken": document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''
+        },
+        credentials: "include",
+        body: JSON.stringify({ 
+          message,
+          session_id: localStorage.getItem('chat_session_id') || undefined
+        }),
       });
       if (!response.ok) throw new Error("Failed to send message");
-      return response.json();
+      const data = await response.json();
+      if (data.session_id) {
+        localStorage.setItem('chat_session_id', data.session_id);
+      }
+      return {
+        id: Date.now().toString(),
+        ...data
+      };
     },
     onSuccess: (data) => {
       setMessages(prev => [...prev, data]);
@@ -54,13 +74,13 @@ export default function ChatInterface() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: input,
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     chatMutation.mutate(input);
@@ -76,14 +96,15 @@ export default function ChatInterface() {
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4 mb-4">
           {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              onOptionSelect={(option) => chatMutation.mutate(option)}
-            />
-          ))}
-          {message.recommendations?.map((rec) => (
-            <DrinkCard key={rec.id} drink={rec} />
+            <div key={message.id}>
+              <ChatMessage
+                message={message}
+                onOptionSelect={(option) => chatMutation.mutate(option)}
+              />
+              {message.recommendations?.map((rec) => (
+                <DrinkCard key={rec.id} drink={rec} />
+              ))}
+            </div>
           ))}
         </div>
         <div ref={scrollRef} />
