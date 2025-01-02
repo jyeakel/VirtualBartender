@@ -50,19 +50,22 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gray-50">
       {/* Left sidebar */}
-      <div className="w-64 bg-muted p-4">
-        <h2 className="text-lg font-semibold mb-4">Virtual Bartender</h2>
+      <div className="w-64 bg-white border-r border-gray-200 p-4">
+        <h2 className="text-xl font-semibold mb-6 text-gray-800">Virtual Bartender</h2>
         <nav className="space-y-2">
           <Button 
             variant="ghost" 
-            className="w-full justify-start"
+            className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             onClick={startChat}
           >
             New Chat
           </Button>
-          <Button variant="ghost" className="w-full justify-start">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+          >
             About
           </Button>
         </nav>
@@ -70,7 +73,7 @@ export default function Home() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
-        <main className="flex-1 p-4">
+        <main className="flex-1 p-6 max-w-4xl mx-auto w-full">
           {messages.length > 0 ? (
             <ChatWindow 
               messages={messages} 
@@ -78,15 +81,21 @@ export default function Home() {
               sessionId={sessionId!}
             />
           ) : (
-            <Card className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold mb-4">
+            <Card className="h-full flex items-center justify-center bg-white">
+              <div className="text-center px-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">
                   Welcome to Virtual Bartender
                 </h1>
-                <p className="text-muted-foreground mb-6">
-                  Start a new chat to get personalized drink recommendations
+                <p className="text-gray-500 text-lg mb-8 max-w-md">
+                  Start a new chat to get personalized drink recommendations based on your preferences.
                 </p>
-                <Button onClick={startChat}>Start Chat</Button>
+                <Button 
+                  onClick={startChat}
+                  size="lg"
+                  className="px-8"
+                >
+                  Start Chat
+                </Button>
               </div>
             </Card>
           )}
@@ -94,10 +103,10 @@ export default function Home() {
       </div>
 
       {/* Right sidebar for selected drink */}
-      <div className="w-80 bg-muted p-4">
-        <h2 className="text-lg font-semibold mb-4">Selected Drink</h2>
-        <ScrollArea className="h-full">
-          {selectedDrink && (
+      <div className="w-80 bg-white border-l border-gray-200 p-4">
+        <h2 className="text-xl font-semibold mb-4 text-gray-800">Selected Drink</h2>
+        <ScrollArea className="h-[calc(100vh-8rem)]">
+          {selectedDrink ? (
             <DrinkCard
               name={selectedDrink.name}
               description={selectedDrink.description}
@@ -105,6 +114,10 @@ export default function Home() {
               selected
               onSelect={() => {}}
             />
+          ) : (
+            <div className="text-center text-gray-500 mt-8">
+              No drink selected yet
+            </div>
           )}
         </ScrollArea>
       </div>

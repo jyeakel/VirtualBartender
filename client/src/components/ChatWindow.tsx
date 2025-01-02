@@ -101,9 +101,9 @@ export function ChatWindow({
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
+    <Card className="h-full flex flex-col bg-white shadow-sm">
+      <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+        <div className="space-y-6">
           {messages.map((message, i) => (
             <div
               key={i}
@@ -112,21 +112,22 @@ export function ChatWindow({
               }`}
             >
               <div
-                className={`max-w-[80%] rounded-lg p-4 ${
+                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
+                    ? "bg-primary text-primary-foreground ml-4"
+                    : "bg-gray-100 text-gray-900 mr-4"
                 }`}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
-                
+                <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+
                 {message.options && (
-                  <div className="mt-2 space-x-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {message.options.map((option, j) => (
                       <Button
                         key={j}
                         variant="secondary"
                         size="sm"
+                        className="bg-white hover:bg-gray-50 text-gray-900"
                         onClick={() => handleOptionClick(option)}
                       >
                         {option}
@@ -154,13 +155,14 @@ export function ChatWindow({
           ))}
         </div>
       </ScrollArea>
-      
-      <form onSubmit={handleSubmit} className="p-4 border-t">
+
+      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-100">
         <div className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type a message..."
+            className="flex-1"
           />
           <Button type="submit">Send</Button>
         </div>
