@@ -12,7 +12,7 @@ router.post('/start', async (req, res) => {
   try {
     const sessionId = uuidv4();
     const clientIp = req.ip;
-    
+
     // Get location and weather
     const location = await getLocationFromIP(clientIp);
     let weather = '';
@@ -22,11 +22,11 @@ router.post('/start', async (req, res) => {
 
     // Start chat session
     const response = await startConversation();
-    
+
     // Store session
     await db.insert(chatSessions).values({
       sessionId,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
       location: location ? { city: location.city, lat: location.lat, lon: location.lon } : null,
       weather: weather ? { condition: weather } : null
     });
@@ -45,7 +45,7 @@ router.post('/start', async (req, res) => {
 router.post('/message', async (req, res) => {
   try {
     const { sessionId, message } = req.body;
-    
+
     if (!sessionId || !message) {
       return res.status(400).json({ message: 'Session ID and message are required' });
     }

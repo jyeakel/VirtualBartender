@@ -6,12 +6,13 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Message, ChatWindow } from "@/components/ChatWindow";
 import { DrinkCard } from "@/components/DrinkCard";
-import { MessageSquare, Settings, Info, History, Menu } from "lucide-react";
+import { MessageSquare, Settings, Info, History, ChevronLeft, ChevronRight } from "lucide-react";
 import type { SelectDrink } from "@db/schema";
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string>();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { toast } = useToast();
 
   const { data: selectedDrink } = useQuery<SelectDrink>({
@@ -53,44 +54,54 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-50 font-sans antialiased">
       {/* Left sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200">
+      <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 transition-all duration-200`}>
         <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold tracking-tight">Virtual Bartender</h2>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
+          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} mb-4`}>
+            {!sidebarCollapsed && (
+              <h2 className="text-xl font-bold tracking-tight">Virtual Bartender</h2>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="h-5 w-5" />
+              ) : (
+                <ChevronLeft className="h-5 w-5" />
+              )}
             </Button>
           </div>
         </div>
         <nav className="p-2 space-y-1">
           <Button 
             variant="ghost" 
-            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
+            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
             onClick={startChat}
           >
             <MessageSquare className="h-4 w-4" />
-            New Chat
+            {!sidebarCollapsed && "Step to the bar"}
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
+            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
           >
             <History className="h-4 w-4" />
-            Chat History
+            {!sidebarCollapsed && "Chat History"}
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
+            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
           >
             <Settings className="h-4 w-4" />
-            Settings
+            {!sidebarCollapsed && "Settings"}
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
+            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
           >
             <Info className="h-4 w-4" />
-            About
+            {!sidebarCollapsed && "About"}
           </Button>
         </nav>
       </div>
@@ -118,7 +129,7 @@ export default function Home() {
                   size="lg"
                   className="px-8 font-medium"
                 >
-                  Start Chat
+                  Step to the bar
                 </Button>
               </div>
             </Card>
