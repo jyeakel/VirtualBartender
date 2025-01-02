@@ -43,7 +43,6 @@ export const chatSessions = pgTable("chat_sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   location: jsonb("location"),
   weather: jsonb("weather"),
-  conversationHistory: jsonb("conversation_history").default([]),
 });
 
 // Define relations
