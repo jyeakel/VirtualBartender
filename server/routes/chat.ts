@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { startConversation, generateResponse } from '../lib/openai';
-import { getWeather, getLocationFromIP } from '../lib/weather';
 import { db } from '@db';
-import { chatSessions, drinks } from '@db/schema';
+import { chatSessions } from '@db/schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -11,14 +10,6 @@ const router = Router();
 router.post('/start', async (req, res) => {
   try {
     const sessionId = uuidv4();
-    const clientIp = req.ip;
-
-    // Get location and weather
-    const location = await getLocationFromIP(clientIp);
-    let weather = '';
-    if (location) {
-      weather = await getWeather(location.lat, location.lon);
-    }
 
     // Start chat session
     const response = await startConversation();
@@ -27,8 +18,8 @@ router.post('/start', async (req, res) => {
     await db.insert(chatSessions).values({
       sessionId,
       createdAt: new Date(),
-      location: location ? { city: location.city, lat: location.lat, lon: location.lon } : null,
-      weather: weather ? { condition: weather } : null
+      location: null,
+      weather: null
     });
 
     res.json({
@@ -61,8 +52,6 @@ router.post('/message', async (req, res) => {
 
     // Generate response
     const context = {
-      weather: session.weather?.condition,
-      location: session.location?.city,
       time: new Date().toLocaleTimeString()
     };
 

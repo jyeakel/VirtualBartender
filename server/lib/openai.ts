@@ -1,6 +1,6 @@
 import OpenAI from "openai";
+import { type ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface ChatResponse {
@@ -32,7 +32,7 @@ Respond in JSON format with:
 
 export async function startConversation(): Promise<ChatResponse> {
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: "Hi, I'd like a drink recommendation" }
@@ -40,21 +40,21 @@ export async function startConversation(): Promise<ChatResponse> {
     response_format: { type: "json_object" }
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  return JSON.parse(response.choices[0].message.content || "{}");
 }
 
 export async function generateResponse(
-  messages: { role: string; content: string }[],
+  messages: ChatCompletionMessageParam[],
   context: {
     weather?: string;
     time?: string;
     location?: string;
   }
 ): Promise<ChatResponse> {
-  const contextPrompt = `Current context: ${context.time || ''}, Weather: ${context.weather || ''}, Location: ${context.location || ''}`;
-  
+  const contextPrompt = `Current context: ${context.time || 'unknown time'}, Weather: ${context.weather || 'unknown weather'}, Location: ${context.location || 'unknown location'}`;
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "system", content: contextPrompt },
@@ -63,5 +63,5 @@ export async function generateResponse(
     response_format: { type: "json_object" }
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  return JSON.parse(response.choices[0].message.content || "{}");
 }
