@@ -30,11 +30,10 @@ export default function ChatInterface() {
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const response = await fetch("http://localhost:8000/api/chat/", {
+      const response = await fetch("/api/chat/", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "X-CSRFToken": document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''
         },
         credentials: "include",
         body: JSON.stringify({ 
@@ -42,7 +41,12 @@ export default function ChatInterface() {
           session_id: localStorage.getItem('chat_session_id') || undefined
         }),
       });
-      if (!response.ok) throw new Error("Failed to send message");
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to send message");
+      }
+
       const data = await response.json();
       if (data.session_id) {
         localStorage.setItem('chat_session_id', data.session_id);
@@ -56,7 +60,8 @@ export default function ChatInterface() {
       setMessages(prev => [...prev, data]);
       scrollToBottom();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Chat error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -102,7 +107,11 @@ export default function ChatInterface() {
                 onOptionSelect={(option) => chatMutation.mutate(option)}
               />
               {message.recommendations?.map((rec) => (
-                <DrinkCard key={rec.id} drink={rec} />
+                <DrinkCard 
+                  key={rec.id} 
+                  drink={rec} 
+                  onSelect={() => chatMutation.mutate(`I choose ${rec.name}`)}
+                />
               ))}
             </div>
           ))}
