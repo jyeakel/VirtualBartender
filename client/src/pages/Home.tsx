@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Message, ChatWindow } from "@/components/ChatWindow";
 import { DrinkCard } from "@/components/DrinkCard";
+import { MessageSquare, Settings, Info, History, Menu } from "lucide-react";
 import type { SelectDrink } from "@db/schema";
 
 export default function Home() {
@@ -50,22 +51,45 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 font-sans antialiased">
       {/* Left sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 p-4">
-        <h2 className="text-xl font-semibold mb-6 text-gray-800">Virtual Bartender</h2>
-        <nav className="space-y-2">
+      <div className="w-64 bg-white border-r border-gray-200">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold tracking-tight">Virtual Bartender</h2>
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+        <nav className="p-2 space-y-1">
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
             onClick={startChat}
           >
+            <MessageSquare className="h-4 w-4" />
             New Chat
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
           >
+            <History className="h-4 w-4" />
+            Chat History
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium"
+          >
+            <Info className="h-4 w-4" />
             About
           </Button>
         </nav>
@@ -83,16 +107,16 @@ export default function Home() {
           ) : (
             <Card className="h-full flex items-center justify-center bg-white">
               <div className="text-center px-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                <h1 className="text-4xl font-bold tracking-tight text-gray-900 mb-4">
                   Welcome to Virtual Bartender
                 </h1>
-                <p className="text-gray-500 text-lg mb-8 max-w-md">
+                <p className="text-gray-500 text-lg mb-8 max-w-md leading-relaxed">
                   Start a new chat to get personalized drink recommendations based on your preferences.
                 </p>
                 <Button 
                   onClick={startChat}
                   size="lg"
-                  className="px-8"
+                  className="px-8 font-medium"
                 >
                   Start Chat
                 </Button>
@@ -102,11 +126,11 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Right sidebar for selected drink */}
-      <div className="w-80 bg-white border-l border-gray-200 p-4">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">Selected Drink</h2>
-        <ScrollArea className="h-[calc(100vh-8rem)]">
-          {selectedDrink ? (
+      {/* Right sidebar for selected drink - only shown when a drink is selected */}
+      {selectedDrink && (
+        <div className="w-80 bg-white border-l border-gray-200 p-4">
+          <h2 className="text-xl font-bold tracking-tight mb-4 text-gray-800">Selected Drink</h2>
+          <ScrollArea className="h-[calc(100vh-8rem)]">
             <DrinkCard
               name={selectedDrink.name}
               description={selectedDrink.description}
@@ -114,13 +138,9 @@ export default function Home() {
               selected
               onSelect={() => {}}
             />
-          ) : (
-            <div className="text-center text-gray-500 mt-8">
-              No drink selected yet
-            </div>
-          )}
-        </ScrollArea>
-      </div>
+          </ScrollArea>
+        </div>
+      )}
     </div>
   );
 }

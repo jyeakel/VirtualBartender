@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { Send } from "lucide-react";
 import { DrinkCard } from "./DrinkCard";
 
 export interface Message {
@@ -115,10 +116,10 @@ export function ChatWindow({
                 className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
                     ? "bg-primary text-primary-foreground ml-4"
-                    : "bg-gray-100 text-gray-900 mr-4"
+                    : "bg-gray-50 text-gray-900 mr-4"
                 }`}
               >
-                <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium">{message.content}</p>
 
                 {message.options && (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -127,7 +128,7 @@ export function ChatWindow({
                         key={j}
                         variant="secondary"
                         size="sm"
-                        className="bg-white hover:bg-gray-50 text-gray-900"
+                        className="bg-white hover:bg-gray-50 text-gray-900 font-medium"
                         onClick={() => handleOptionClick(option)}
                       >
                         {option}
@@ -164,7 +165,9 @@ export function ChatWindow({
             placeholder="Type a message..."
             className="flex-1"
           />
-          <Button type="submit">Send</Button>
+          <Button type="submit" size="icon">
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
       </form>
     </Card>
