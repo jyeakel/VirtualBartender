@@ -1,0 +1,14 @@
+[project]
+name = "repl-nix-virtualbartenderai"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.1.4",
+    "django-cors-headers>=4.6.0",
+    "djangorestframework>=3.15.2",
+    "openai>=1.58.1",
+    "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
+]
