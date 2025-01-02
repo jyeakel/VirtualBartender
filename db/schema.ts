@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -10,6 +10,7 @@ export const drinks = pgTable("drinks", {
   instructions: text("instructions").notNull(),
   imageUrl: text("image_url"),
   tags: text("tags").array(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Ingredients table
@@ -39,9 +40,10 @@ export const chatSessions = pgTable("chat_sessions", {
   sessionId: text("session_id").notNull().unique(),
   preferences: jsonb("preferences"),
   selectedDrinkId: integer("selected_drink_id").references(() => drinks.id),
-  createdAt: text("created_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   location: jsonb("location"),
   weather: jsonb("weather"),
+  conversationHistory: jsonb("conversation_history").default([]),
 });
 
 // Define relations
@@ -53,13 +55,25 @@ export const ingredientsRelations = relations(ingredients, ({ many }) => ({
   drinks: many(drinkIngredients),
 }));
 
+export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
+  selectedDrink: one(drinks, {
+    fields: [chatSessions.selectedDrinkId],
+    references: [drinks.id],
+  }),
+}));
+
 // Export schemas
 export const insertDrinkSchema = createInsertSchema(drinks);
 export const selectDrinkSchema = createSelectSchema(drinks);
 export const insertIngredientSchema = createInsertSchema(ingredients);
 export const selectIngredientSchema = createSelectSchema(ingredients);
+export const insertChatSessionSchema = createInsertSchema(chatSessions);
+export const selectChatSessionSchema = createSelectSchema(chatSessions);
 
+// Export types
 export type InsertDrink = typeof drinks.$inferInsert;
 export type SelectDrink = typeof drinks.$inferSelect;
 export type InsertIngredient = typeof ingredients.$inferInsert;
 export type SelectIngredient = typeof ingredients.$inferSelect;
+export type InsertChatSession = typeof chatSessions.$inferInsert;
+export type SelectChatSession = typeof chatSessions.$inferSelect;
