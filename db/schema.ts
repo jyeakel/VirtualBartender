@@ -10,6 +10,16 @@ export const drinks = pgTable("drinks", {
   instructions: text("instructions").notNull(),
   imageUrl: text("image_url"),
   tags: text("tags").array(),
+  categoryId: integer("category_id").references(() => drinkCategories.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Drink Categories table
+export const drinkCategories = pgTable("drink_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -18,7 +28,10 @@ export const ingredients = pgTable("ingredients", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   category: text("category").notNull(),
+  description: text("description"),
+  alcoholContent: integer("alcohol_content"),
   isCommon: boolean("is_common").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // DrinkIngredients junction table
@@ -32,6 +45,34 @@ export const drinkIngredients = pgTable("drink_ingredients", {
     .references(() => ingredients.id),
   amount: text("amount").notNull(),
   unit: text("unit").notNull(),
+  isOptional: boolean("is_optional").default(false),
+  notes: text("notes"),
+});
+
+// Drink Recipes table (for detailed preparation steps)
+export const drinkRecipes = pgTable("drink_recipes", {
+  id: serial("id").primaryKey(),
+  drinkId: integer("drink_id")
+    .notNull()
+    .references(() => drinks.id),
+  stepNumber: integer("step_number").notNull(),
+  instruction: text("instruction").notNull(),
+  duration: integer("duration"), // in seconds
+  notes: text("notes"),
+});
+
+// Drink Ratings table
+export const drinkRatings = pgTable("drink_ratings", {
+  id: serial("id").primaryKey(),
+  drinkId: integer("drink_id")
+    .notNull()
+    .references(() => drinks.id),
+  sessionId: text("session_id")
+    .notNull()
+    .references(() => chatSessions.sessionId),
+  rating: integer("rating").notNull(), // 1-5 stars
+  review: text("review"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Chat sessions table
@@ -46,19 +87,30 @@ export const chatSessions = pgTable("chat_sessions", {
 });
 
 // Define relations
-export const drinksRelations = relations(drinks, ({ many }) => ({
+export const drinksRelations = relations(drinks, ({ one, many }) => ({
+  category: one(drinkCategories, {
+    fields: [drinks.categoryId],
+    references: [drinkCategories.id],
+  }),
   ingredients: many(drinkIngredients),
+  recipes: many(drinkRecipes),
+  ratings: many(drinkRatings),
+}));
+
+export const drinkCategoriesRelations = relations(drinkCategories, ({ many }) => ({
+  drinks: many(drinks),
 }));
 
 export const ingredientsRelations = relations(ingredients, ({ many }) => ({
   drinks: many(drinkIngredients),
 }));
 
-export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
+export const chatSessionsRelations = relations(chatSessions, ({ one, many }) => ({
   selectedDrink: one(drinks, {
     fields: [chatSessions.selectedDrinkId],
     references: [drinks.id],
   }),
+  ratings: many(drinkRatings),
 }));
 
 // Export schemas
@@ -68,6 +120,10 @@ export const insertIngredientSchema = createInsertSchema(ingredients);
 export const selectIngredientSchema = createSelectSchema(ingredients);
 export const insertChatSessionSchema = createInsertSchema(chatSessions);
 export const selectChatSessionSchema = createSelectSchema(chatSessions);
+export const insertDrinkCategorySchema = createInsertSchema(drinkCategories);
+export const selectDrinkCategorySchema = createSelectSchema(drinkCategories);
+export const insertDrinkRatingSchema = createInsertSchema(drinkRatings);
+export const selectDrinkRatingSchema = createSelectSchema(drinkRatings);
 
 // Export types
 export type InsertDrink = typeof drinks.$inferInsert;
@@ -76,3 +132,7 @@ export type InsertIngredient = typeof ingredients.$inferInsert;
 export type SelectIngredient = typeof ingredients.$inferSelect;
 export type InsertChatSession = typeof chatSessions.$inferInsert;
 export type SelectChatSession = typeof chatSessions.$inferSelect;
+export type InsertDrinkCategory = typeof drinkCategories.$inferInsert;
+export type SelectDrinkCategory = typeof drinkCategories.$inferSelect;
+export type InsertDrinkRating = typeof drinkRatings.$inferInsert;
+export type SelectDrinkRating = typeof drinkRatings.$inferSelect;
