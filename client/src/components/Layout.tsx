@@ -8,7 +8,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans antialiased">
+    <div className="flex h-screen overflow-hidden bg-gray-50 font-sans antialiased">
       {/* Left sidebar */}
       <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 transition-all duration-200`}>
         <div className="p-4 border-b border-gray-200">
@@ -70,8 +70,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col">
-        <main className="flex-1 p-6 max-w-4xl mx-auto w-full">
+      <div className="flex-1 flex flex-col min-h-0">
+        <main className="flex-1 p-6 max-w-4xl mx-auto w-full min-h-0">
           {children}
         </main>
       </div>

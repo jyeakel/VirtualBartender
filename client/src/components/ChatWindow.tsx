@@ -102,8 +102,8 @@ export function ChatWindow({
   };
 
   return (
-    <Card className="h-full flex flex-col bg-white shadow-sm">
-      <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+    <Card className="h-[calc(100vh-6rem)] flex flex-col bg-white shadow-sm overflow-hidden">
+      <ScrollArea className="flex-1 overflow-auto p-6" ref={scrollRef}>
         <div className="space-y-6">
           {messages.map((message, i) => (
             <div
