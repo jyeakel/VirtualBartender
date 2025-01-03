@@ -1,4 +1,13 @@
-import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  boolean,
+  jsonb,
+  timestamp,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -6,27 +15,54 @@ import { relations } from "drizzle-orm";
 export const drinks = pgTable("drinks", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  description: text("description").notNull(),
-  imageUrl: text("image_url"),
-  recipeUrl: text("recipe_url"), // External recipe URL
-  tags: text("tags").array(),
+  recipeUrl: text("recipe_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// DrinkIngredients table - now includes ingredient information directly
-export const drinkIngredients = pgTable("drink_ingredients", {
+// Tags table
+export const tags = pgTable("tags", {
   id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Ingredients table (for reusable ingredients)
+export const ingredients = pgTable("ingredients", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  category: text("category"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Junction table for drinks and ingredients
+export const drinkIngredients = pgTable("drink_ingredients", {
   drinkId: integer("drink_id")
     .notNull()
     .references(() => drinks.id),
-  name: text("name").notNull(),
+  ingredientId: integer("ingredient_id")
+    .notNull()
+    .references(() => ingredients.id),
   amount: text("amount").notNull(),
   unit: text("unit").notNull(),
-  category: text("category"),
   isOptional: boolean("is_optional").default(false),
   notes: text("notes"),
-});
+}, (t) => ({
+  pk: primaryKey(t.drinkId, t.ingredientId),
+}));
+
+// Junction table for drinks and tags
+export const drinkTags = pgTable("drink_tags", {
+  drinkId: integer("drink_id")
+    .notNull()
+    .references(() => drinks.id),
+  tagId: integer("tag_id")
+    .notNull()
+    .references(() => tags.id),
+}, (t) => ({
+  pk: primaryKey(t.drinkId, t.tagId),
+}));
 
 // Chat sessions table
 export const chatSessions = pgTable("chat_sessions", {
@@ -42,6 +78,15 @@ export const chatSessions = pgTable("chat_sessions", {
 // Define relations
 export const drinksRelations = relations(drinks, ({ many }) => ({
   ingredients: many(drinkIngredients),
+  tags: many(drinkTags),
+}));
+
+export const tagsRelations = relations(tags, ({ many }) => ({
+  drinks: many(drinkTags),
+}));
+
+export const ingredientsRelations = relations(ingredients, ({ many }) => ({
+  drinks: many(drinkIngredients),
 }));
 
 export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
@@ -54,11 +99,19 @@ export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
 // Export schemas
 export const insertDrinkSchema = createInsertSchema(drinks);
 export const selectDrinkSchema = createSelectSchema(drinks);
+export const insertTagSchema = createInsertSchema(tags);
+export const selectTagSchema = createSelectSchema(tags);
+export const insertIngredientSchema = createInsertSchema(ingredients);
+export const selectIngredientSchema = createSelectSchema(ingredients);
 export const insertChatSessionSchema = createInsertSchema(chatSessions);
 export const selectChatSessionSchema = createSelectSchema(chatSessions);
 
 // Export types
 export type InsertDrink = typeof drinks.$inferInsert;
 export type SelectDrink = typeof drinks.$inferSelect;
+export type InsertTag = typeof tags.$inferInsert;
+export type SelectTag = typeof tags.$inferSelect;
+export type InsertIngredient = typeof ingredients.$inferInsert;
+export type SelectIngredient = typeof ingredients.$inferSelect;
 export type InsertChatSession = typeof chatSessions.$inferInsert;
 export type SelectChatSession = typeof chatSessions.$inferSelect;
