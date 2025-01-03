@@ -13,6 +13,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const { data: selectedDrink } = useQuery<SelectDrink>({
@@ -21,6 +22,7 @@ export default function Home() {
   });
 
   const startChat = async () => {
+    setIsLoading(true);
     try {
       const response = await fetch("/api/chat/start", {
         method: "POST",
@@ -48,64 +50,13 @@ export default function Home() {
         description: "Failed to start chat session",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans antialiased">
-      {/* Left sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 transition-all duration-200`}>
-        <div className="p-4 border-b border-gray-200">
-          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} mb-4`}>
-            {!sidebarCollapsed && (
-              <h2 className="text-xl font-bold tracking-tight">Virtual Bartender</h2>
-            )}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              {sidebarCollapsed ? (
-                <ChevronRight className="h-5 w-5" />
-              ) : (
-                <ChevronLeft className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-        </div>
-        <nav className="p-2 space-y-1">
-          <Button 
-            variant="ghost" 
-            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
-            onClick={startChat}
-          >
-            <Martini className="h-4 w-4" />
-            {!sidebarCollapsed && "Step to the bar"}
-          </Button>
-          <Button 
-            variant="ghost" 
-            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
-          >
-            <History className="h-4 w-4" />
-            {!sidebarCollapsed && "Chat History"}
-          </Button>
-          <Button 
-            variant="ghost" 
-            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
-          >
-            <Settings className="h-4 w-4" />
-            {!sidebarCollapsed && "Settings"}
-          </Button>
-          <Button 
-            variant="ghost" 
-            className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
-          >
-            <Info className="h-4 w-4" />
-            {!sidebarCollapsed && "About"}
-          </Button>
-        </nav>
-      </div>
-
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         <main className="flex-1 p-6 max-w-4xl mx-auto w-full">
@@ -128,9 +79,22 @@ export default function Home() {
                   onClick={startChat}
                   size="lg"
                   className="px-8 font-medium"
+                  disabled={isLoading}
                 >
-                  <Martini className="h-5 w-5 mr-2" />
-                  Step to the bar
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <Martini className="h-5 w-5 mr-2" />
+                      Step to the bar
+                    </>
+                  )}
                 </Button>
               </div>
             </Card>
