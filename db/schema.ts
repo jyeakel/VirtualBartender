@@ -7,48 +7,24 @@ export const drinks = pgTable("drinks", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull(),
-  instructions: text("instructions").notNull(),
   imageUrl: text("image_url"),
+  recipeUrl: text("recipe_url"), // External recipe URL
   tags: text("tags").array(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Ingredients table
-export const ingredients = pgTable("ingredients", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  category: text("category").notNull(),
-  description: text("description"),
-  alcoholContent: integer("alcohol_content"),
-  isCommon: boolean("is_common").default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// DrinkIngredients junction table
+// DrinkIngredients table - now includes ingredient information directly
 export const drinkIngredients = pgTable("drink_ingredients", {
   id: serial("id").primaryKey(),
   drinkId: integer("drink_id")
     .notNull()
     .references(() => drinks.id),
-  ingredientId: integer("ingredient_id")
-    .notNull()
-    .references(() => ingredients.id),
+  name: text("name").notNull(),
   amount: text("amount").notNull(),
   unit: text("unit").notNull(),
+  category: text("category"),
   isOptional: boolean("is_optional").default(false),
-  notes: text("notes"),
-});
-
-// Drink Recipes table (for detailed preparation steps)
-export const drinkRecipes = pgTable("drink_recipes", {
-  id: serial("id").primaryKey(),
-  drinkId: integer("drink_id")
-    .notNull()
-    .references(() => drinks.id),
-  stepNumber: integer("step_number").notNull(),
-  instruction: text("instruction").notNull(),
-  duration: integer("duration"), // in seconds
   notes: text("notes"),
 });
 
@@ -66,11 +42,6 @@ export const chatSessions = pgTable("chat_sessions", {
 // Define relations
 export const drinksRelations = relations(drinks, ({ many }) => ({
   ingredients: many(drinkIngredients),
-  recipes: many(drinkRecipes),
-}));
-
-export const ingredientsRelations = relations(ingredients, ({ many }) => ({
-  drinks: many(drinkIngredients),
 }));
 
 export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
@@ -83,16 +54,11 @@ export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
 // Export schemas
 export const insertDrinkSchema = createInsertSchema(drinks);
 export const selectDrinkSchema = createSelectSchema(drinks);
-export const insertIngredientSchema = createInsertSchema(ingredients);
-export const selectIngredientSchema = createSelectSchema(ingredients);
 export const insertChatSessionSchema = createInsertSchema(chatSessions);
 export const selectChatSessionSchema = createSelectSchema(chatSessions);
-
 
 // Export types
 export type InsertDrink = typeof drinks.$inferInsert;
 export type SelectDrink = typeof drinks.$inferSelect;
-export type InsertIngredient = typeof ingredients.$inferInsert;
-export type SelectIngredient = typeof ingredients.$inferSelect;
 export type InsertChatSession = typeof chatSessions.$inferInsert;
 export type SelectChatSession = typeof chatSessions.$inferSelect;
