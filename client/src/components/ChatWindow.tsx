@@ -39,19 +39,15 @@ export function ChatWindow({
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.parentElement;
-      if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: 'smooth'
-        });
+      const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
       }
     }
   };
 
   useEffect(() => {
-    const timeoutId = setTimeout(scrollToBottom, 100);
-    return () => clearTimeout(timeoutId);
+    scrollToBottom();
   }, [messages]);
 
   const sendMessage = async (content: string) => {
@@ -110,8 +106,7 @@ export function ChatWindow({
 
   return (
     <Card className="h-[calc(100vh-6rem)] flex flex-col bg-white shadow-sm overflow-hidden">
-      <ScrollArea className="flex-1 overflow-auto p-6">
-        <div ref={scrollRef}>
+      <ScrollArea className="flex-1 overflow-auto p-6" ref={scrollRef}>
         <div className="space-y-6">
           {messages.map((message, i) => (
             <div
@@ -161,7 +156,6 @@ export function ChatWindow({
               </div>
             </div>
           ))}
-        </div>
         </div>
       </ScrollArea>
 
