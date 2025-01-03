@@ -143,7 +143,6 @@ export function ChatWindow({
                       <DrinkCard
                         key={drink.id}
                         name={drink.name}
-                        description={drink.description}
                         reasoning={drink.reasoning}
                         selected={drink.id === selectedDrinkId}
                         onSelect={() => handleDrinkSelect(drink.id)}

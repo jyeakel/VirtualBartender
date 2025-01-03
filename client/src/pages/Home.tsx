@@ -145,7 +145,6 @@ export default function Home() {
           <ScrollArea className="h-[calc(100vh-8rem)]">
             <DrinkCard
               name={selectedDrink.name}
-              description={selectedDrink.description}
               reasoning="Selected drink"
               selected
               onSelect={() => {}}
