@@ -32,19 +32,21 @@ export async function getWeather(lat: number, lon: number): Promise<string> {
 }
 
 export async function getLocationFromIP(ip: string): Promise<{ 
-  lat: number;
-  lon: number;
+  regionname: string;
   city: string;
+  zip: string;
+  timezone: string;
 } | null> {
   try {
-    const response = await fetch(`http://ip-api.com/json/${ip}`);
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=312`);
     const data = await response.json();
     
     if (data.status === 'success') {
       return {
-        lat: data.lat,
-        lon: data.lon,
-        city: data.city
+        regionname: data.regionName,
+        city: data.lon,
+        zip: data.zip,
+        timezone: data.timezone
       };
     }
     return null;
