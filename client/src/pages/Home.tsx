@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Message, ChatWindow } from "@/components/ChatWindow";
 import { DrinkCard } from "@/components/DrinkCard";
-import { GlassWater, Settings, Info, History, ChevronLeft, ChevronRight } from "lucide-react";
+import { Martini, Settings, Info, History, ChevronLeft, ChevronRight } from "lucide-react";
 import type { SelectDrink } from "@db/schema";
 
 export default function Home() {
@@ -79,7 +79,7 @@ export default function Home() {
             className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
             onClick={startChat}
           >
-            <GlassWater className="h-4 w-4" />
+            <Martini className="h-4 w-4" />
             {!sidebarCollapsed && "Step to the bar"}
           </Button>
           <Button 
