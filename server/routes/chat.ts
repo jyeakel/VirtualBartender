@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { startConversation, generateResponse } from '../lib/openai';
+import { getWeather, getLocationFromIP } from '../lib/weather';
 import { db } from '@db';
 import { chatSessions } from '@db/schema';
 import { eq } from 'drizzle-orm';
@@ -27,7 +28,12 @@ router.post('/start', async (req, res) => {
     res.json({
       sessionId,
       message: response.message,
-      options: response.options
+      options: [
+        "Let me know what you have on hand",
+        "What cocktail should I make?",
+        "What's your favorite cocktail?",
+        "I'm in the mood for something refreshing"
+      ]
     });
   } catch (error) {
     console.error('Error starting chat:', error);
@@ -52,9 +58,22 @@ router.post('/message', async (req, res) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
+    // Get weather and location data
+    const clientIp = req.ip || req.socket.remoteAddress || '';
+    // TESTING ONLY - MUST REMOVE
+    //const clientIp = '67.245.228.183'
+    const location = await getLocationFromIP(clientIp);
+    let weatherInfo = '';
+    
+    if (location) {
+      weatherInfo = await getWeather(location.lat, location.lon); // Using city as latitude since that's what our current implementation returns
+    }
+
     // Generate response
     const context = {
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString(),
+      weather: weatherInfo,
+      location: location ? `${location.city}, ${location.regionname}` : undefined
     };
 
     const response = await generateResponse([

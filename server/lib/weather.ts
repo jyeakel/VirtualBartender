@@ -1,3 +1,4 @@
+import internal from "stream";
 import { z } from "zod";
 
 const weatherResponseSchema = z.object({
@@ -36,17 +37,23 @@ export async function getLocationFromIP(ip: string): Promise<{
   city: string;
   zip: string;
   timezone: string;
+  lat: number;
+  lon: number; 
+
 } | null> {
   try {
-    const response = await fetch(`http://ip-api.com/json/${ip}?fields=312`);
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=16888`);
     const data = await response.json();
+    console.log(data)
     
     if (data.status === 'success') {
       return {
         regionname: data.regionName,
-        city: data.lon,
+        city: data.city,
         zip: data.zip,
-        timezone: data.timezone
+        timezone: data.timezone,
+        lat: data.lat,
+        lon: data.lon
       };
     }
     return null;

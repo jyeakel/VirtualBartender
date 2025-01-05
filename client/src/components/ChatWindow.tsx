@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Send } from "lucide-react";
 import { DrinkCard } from "./DrinkCard";
+import { IngredientsSelector } from "./IngredientsSelector";
 
 export interface Message {
   role: "user" | "assistant";
@@ -34,6 +35,9 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [selectedDrinkId, setSelectedDrinkId] = useState<number>();
+  const [showIngredients, setShowIngredients] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -54,6 +58,7 @@ export function ChatWindow({
   }, [messages]);
 
   const sendMessage = async (content: string) => {
+    setIsLoading(true); // Set loading state to true before sending message
     try {
       const response = await fetch("/api/chat/message", {
         method: "POST",
@@ -83,6 +88,8 @@ export function ChatWindow({
         description: "Failed to send message",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false); // Reset loading state after the request completes
     }
   };
 
@@ -96,8 +103,12 @@ export function ChatWindow({
   };
 
   const handleOptionClick = async (option: string) => {
-    setMessages(prev => [...prev, { role: "user", content: option }]);
-    await sendMessage(option);
+    if (option === "Let me know what you have on hand") {
+      setShowIngredients(true);
+    } else {
+      setMessages(prev => [...prev, { role: "user", content: option }]);
+      await sendMessage(option);
+    }
   };
 
   const handleDrinkSelect = (drinkId: number) => {
@@ -108,10 +119,12 @@ export function ChatWindow({
   };
 
   return (
-    <Card className="h-[calc(100vh-6rem)] flex flex-col bg-white shadow-sm overflow-hidden">
-      <ScrollArea className="flex-1 overflow-auto p-6" ref={scrollRef}>
-        <div className="space-y-6">
-          {messages.map((message, i) => (
+    <div className="flex h-[calc(100vh-6rem)]">
+      <div className={`flex-1 flex flex-col transition-all duration-200 ${showIngredients ? 'mr-4' : ''}`}>
+        <Card className="flex-1 flex flex-col bg-white shadow-sm overflow-hidden">
+          <ScrollArea className="flex-1 overflow-auto p-6" ref={scrollRef}>
+            <div className="space-y-6">
+              {messages.map((message, i) => (
             <div
               key={i}
               className={`flex ${
@@ -159,22 +172,58 @@ export function ChatWindow({
               </div>
             </div>
           ))}
-        </div>
-      </ScrollArea>
-
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-100">
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1"
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] space-y-2 bg-gray-50 rounded-2xl p-4">
+                    <div className="space-y-2">
+                      <div className="h-4 w-[200px] bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 w-[160px] bg-gray-200 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <form onSubmit={handleSubmit} className="p-4 border-t border-gray-100">
+            <div className="flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1"
+              />
+              {selectedIngredients.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowIngredients(true)}
+                >
+                  {selectedIngredients.length} Ingredients
+                </Button>
+              )}
+              <Button type="submit" size="icon">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+      {showIngredients && (
+        <div className="w-80 bg-white border rounded-lg shadow-sm overflow-hidden">
+          <IngredientsSelector
+            initialIngredients={selectedIngredients}
+            onClose={() => setShowIngredients(false)}
+            onSubmit={async (ingredients: string[]) => {
+              setSelectedIngredients(ingredients);
+              setMessages(prev => [...prev, { 
+                role: "user", 
+                content: `I have these ingredients: ${ingredients.join(", ")}` 
+              }]);
+              await sendMessage(`I have these ingredients: ${ingredients.join(", ")}`);
+            }}
           />
-          <Button type="submit" size="icon">
-            <Send className="h-4 w-4" />
-          </Button>
         </div>
-      </form>
-    </Card>
+      )}
+    </div>
   );
 }
