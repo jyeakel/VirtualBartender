@@ -92,7 +92,7 @@ export default function Home() {
                   ) : (
                     <>
                       <Martini className="h-5 w-5 mr-2" />
-                      Step to the bar
+                      Sidle Up
                     </>
                   )}
                 </Button>

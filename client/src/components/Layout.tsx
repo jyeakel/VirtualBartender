@@ -36,7 +36,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
             >
               <Martini className="h-4 w-4" />
-              {!sidebarCollapsed && "Step to the bar"}
+              {!sidebarCollapsed && "Sidle Up"}
             </Button>
           </Link>
           <Link href="/history">
