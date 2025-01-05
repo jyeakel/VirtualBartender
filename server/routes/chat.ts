@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { startConversation, generateResponse } from '../lib/openai';
 import { getWeather, getLocationFromIP } from '../lib/weather';
 import { db } from '@db';
-import { chatSessions } from '@db/schema';
+import { chatSessions, drinks } from '@db/schema';
+import { desc } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,12 +18,23 @@ router.post('/start', async (req, res) => {
     const response = await startConversation();
     console.log('OpenAI response:', response);
 
+    // Get weather and location data
+    // const clientIp = req.ip || req.socket.remoteAddress || '';
+    // TESTING ONLY - MUST REMOVE
+    const clientIp = '67.245.228.183'
+    const location = await getLocationFromIP(clientIp);
+    let weatherInfo = '';
+    
+    if (location) {
+      weatherInfo = await getWeather(location.lat, location.lon); // Using city as latitude since that's what our current implementation returns
+    }
+
     // Store session
     await db.insert(chatSessions).values({
       sessionId,
       createdAt: new Date(),
-      location: null,
-      weather: null
+      location: location,
+      weather: weatherInfo
     });
 
     res.json({
@@ -43,7 +55,7 @@ router.post('/start', async (req, res) => {
 
 router.post('/message', async (req, res) => {
   try {
-    const { sessionId, message } = req.body;
+    const { sessionId, message, weatherInfo, location } = req.body;
 
     if (!sessionId || !message) {
       return res.status(400).json({ message: 'Session ID and message are required' });
@@ -56,17 +68,6 @@ router.post('/message', async (req, res) => {
 
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
-    }
-
-    // Get weather and location data
-    const clientIp = req.ip || req.socket.remoteAddress || '';
-    // TESTING ONLY - MUST REMOVE
-    //const clientIp = '67.245.228.183'
-    const location = await getLocationFromIP(clientIp);
-    let weatherInfo = '';
-    
-    if (location) {
-      weatherInfo = await getWeather(location.lat, location.lon); // Using city as latitude since that's what our current implementation returns
     }
 
     // Generate response
@@ -92,6 +93,22 @@ router.post('/message', async (req, res) => {
   } catch (error) {
     console.error('Error processing message:', error);
     res.status(500).json({ message: 'Failed to process message' });
+  }
+});
+
+router.get('/history', async (req, res) => {
+  try {
+    const sessions = await db.query.chatSessions.findMany({
+      with: {
+        selectedDrink: true,
+      },
+      orderBy: [desc(chatSessions.createdAt)],
+      limit: 10,
+    });
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    res.status(500).json({ message: 'Failed to fetch chat history' });
   }
 });
 

@@ -71,7 +71,6 @@ export async function generateResponse(
   }
 ): Promise<ChatResponse> {
   const contextPrompt = `Current context: ${context.time || 'unknown time'}, Weather: ${context.weather || 'unknown weather'}, Location: ${context.location || 'unknown location'}`;
-  console.log('context prompt:', contextPrompt)
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4",

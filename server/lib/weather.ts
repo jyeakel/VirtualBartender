@@ -15,7 +15,7 @@ export async function getWeather(lat: number, lon: number): Promise<string> {
   try {
     const API_KEY = process.env.WEATHER_API_KEY;
     const response = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=imperial&appid=${API_KEY}`
     );
     
     if (!response.ok) {
@@ -25,7 +25,7 @@ export async function getWeather(lat: number, lon: number): Promise<string> {
     const data = await response.json();
     const parsed = weatherResponseSchema.parse(data);
     
-    return `${parsed.weather[0].main}, ${Math.round(parsed.main.temp)}°C`;
+    return `${parsed.weather[0].main}, ${Math.round(parsed.main.temp)} °F`;
   } catch (error) {
     console.error('Failed to fetch weather:', error);
     return '';
@@ -44,7 +44,6 @@ export async function getLocationFromIP(ip: string): Promise<{
   try {
     const response = await fetch(`http://ip-api.com/json/${ip}?fields=16888`);
     const data = await response.json();
-    console.log(data)
     
     if (data.status === 'success') {
       return {

@@ -198,7 +198,7 @@ export function ChatWindow({
                   variant="outline"
                   onClick={() => setShowIngredients(true)}
                 >
-                  {selectedIngredients.length} Ingredients
+                  {selectedIngredients.length} {selectedIngredients.length === 1 ? "Ingredient" : "Ingredients"}
                 </Button>
               )}
               <Button type="submit" size="icon">
