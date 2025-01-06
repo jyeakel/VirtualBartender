@@ -1,8 +1,17 @@
 
 import { ChatOpenAI } from "@langchain/openai";
+import { OpenAIEmbeddings } from "@langchain/openai";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+
+const embeddings = new OpenAIEmbeddings({
+  modelName: "text-embedding-3-small"
+});
+
+export async function generateEmbedding(text: string) {
+  return embeddings.embedQuery(text);
+}
 
 const SYSTEM_PROMPT = `You are a friendly and knowledgeable bartender who helps users find the perfect drink based on their preferences and current context. Your responses should be conversational and engaging, while gathering necessary information to make personalized recommendations.
 

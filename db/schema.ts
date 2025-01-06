@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   primaryKey,
+  vector
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
@@ -110,3 +111,24 @@ export type InsertIngredient = typeof ingredients.$inferInsert;
 export type SelectIngredient = typeof ingredients.$inferSelect;
 export type InsertChatSession = typeof chatSessions.$inferInsert;
 export type SelectChatSession = typeof chatSessions.$inferSelect;
+
+// Embeddings table
+export const embeddings = pgTable("embeddings", {
+  id: serial("id").primaryKey(),
+  drinkId: integer("drink_id").references(() => drinks.id),
+  embedding: vector("embedding", { dimensions: 1536 }), // OpenAI's default embedding size
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const embeddingsRelations = relations(embeddings, ({ one }) => ({
+  drink: one(drinks, {
+    fields: [embeddings.drinkId],
+    references: [drinks.id],
+  }),
+}));
+
+export const insertEmbeddingSchema = createInsertSchema(embeddings);
+export const selectEmbeddingSchema = createSelectSchema(embeddings);
+
+export type InsertEmbedding = typeof embeddings.$inferInsert;
+export type SelectEmbedding = typeof embeddings.$inferSelect;
