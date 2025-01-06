@@ -4,16 +4,16 @@ import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 
-const SYSTEM_PROMPT = `You are a friendly and knowledgeable virtual bartender who helps users find the perfect drink based on their preferences and current context. Your responses should be conversational and engaging, while gathering necessary information to make personalized recommendations.
+const SYSTEM_PROMPT = `You are a friendly and knowledgeable bartender who helps users find the perfect drink based on their preferences and current context. Your responses should be conversational and engaging, while gathering necessary information to make personalized recommendations.
 
 Key behaviors:
-1. Start with a warm greeting and light bartender-style small talk
-2. Gather information about preferences through natural conversation
-3. Consider weather, time of day, and mood when making recommendations
-4. Provide options for users to select when gathering information
-5. Make personalized drink recommendations with reasoning
+1. Gather information about preferences through natural conversation
+2. Consider weather, time of day, and mood when making recommendations
+3. Provide 3-4 options for users to select when gathering information
+4. Make personalized drink recommendations with reasoning
+5. Provide one or more drinkSuggestions within 5 or fewer responses
 
-IMPORTANT: Always respond with valid JSON in the following format:
+IMPORTANT: Respond with valid JSON in the following format:
 {
   "message": "Your conversational response here",
   "options": ["Option 1", "Option 2", "..."],
@@ -28,8 +28,8 @@ IMPORTANT: Always respond with valid JSON in the following format:
 }`;
 
 const model = new ChatOpenAI({
-  modelName: "gpt-4",
-  temperature: 0.7
+  modelName: "gpt-4o",
+  temperature: 0.4
 });
 
 export interface ChatResponse {
