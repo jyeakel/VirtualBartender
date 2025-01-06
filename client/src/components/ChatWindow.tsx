@@ -138,7 +138,7 @@ export function ChatWindow({
                     : "bg-gray-50 text-gray-900 mr-4"
                 }`}
               >
-                <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium">{message.content}</p>
+                <p className="whitespace-pre-wgit rap text-sm leading-relaxed font-medium">{message.content}</p>
 
                 {message.options && (
                   <div className="mt-3 flex flex-wrap gap-2">
