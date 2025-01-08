@@ -103,7 +103,7 @@ export function ChatWindow({
   };
 
   const handleOptionClick = async (option: string) => {
-    if (option === "Let me know what you have on hand") {
+    if (option === "I want a drink with specific ingredients") {
       setShowIngredients(true);
     } else {
       setMessages(prev => [...prev, { role: "user", content: option }]);

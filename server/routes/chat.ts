@@ -1,51 +1,55 @@
 import { Router } from 'express';
-import { startConversation, generateResponse } from '../lib/openai';
-import { getWeather, getLocationFromIP } from '../lib/weather';
+import { startConversation, generateResponse, config, graph} from '../lib/openai';
+import { Command} from "@langchain/langgraph";
+import { getWeather, getLocationFromIP, CustomLocation } from '../lib/weather';
 import { db } from '@db';
-import { chatSessions, drinks } from '@db/schema';
+import { chatSessions } from '@db/schema';
 import { desc } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { HumanMessage } from '@langchain/core/messages';
 
-const router = Router();
+export const router = Router();
 
+/**
+ * 1) /start
+ *  - Initiates a new chat session
+ *  - Gets user location info
+ *  - Loads chain state from openai.ts
+ *  - Appends user message, invokes chain once
+ *  - Returns the assistant's new response
+ */
 router.post('/start', async (req, res) => {
   try {
     console.log('Starting new chat session...');
     const sessionId = uuidv4();
-
-    // Start chat session
-    const response = await startConversation();
-    console.log('OpenAI response:', response);
-
-    // Get weather and location data
-    // const clientIp = req.ip || req.socket.remoteAddress || '';
-    // TESTING ONLY - MUST REMOVE
-    const clientIp = '67.245.228.183'
-    const location = await getLocationFromIP(clientIp);
-    let weatherInfo = '';
     
-    if (location) {
-      weatherInfo = await getWeather(location.lat, location.lon); // Using city as latitude since that's what our current implementation returns
+    // get user location + weather
+    // const clientIp = req.ip || req.socket.remoteAddress || '';
+    const clientIp = '67.245.228.183' // Example IP
+    const locationInfo: CustomLocation | null = await getLocationFromIP(clientIp);
+    let weatherInfo = '';
+    if (locationInfo) {
+      weatherInfo = await getWeather(locationInfo.lat, locationInfo.lon);
     }
 
-    // Store session
+    // Store session in DB
     await db.insert(chatSessions).values({
       sessionId,
       createdAt: new Date(),
-      location: location,
+      location: locationInfo,      // or JSON.stringify(location)
       weather: weatherInfo
     });
 
+    // Start the conversation in openai.ts
+    const response = await startConversation(sessionId, weatherInfo, locationInfo);
+
+    // Send initial welcome message
     res.json({
       sessionId,
-      message: response.message,
-      options: [
-        "Let me know what you have on hand",
-        "What cocktail should I make?",
-        "What's your favorite cocktail?",
-        "I'm in the mood for something refreshing"
-      ]
+      // Return the last message in the chain
+      message: response.messages[response.messages.length - 1].content,
+      options: response.options
     });
   } catch (error) {
     console.error('Error starting chat:', error);
@@ -53,63 +57,41 @@ router.post('/start', async (req, res) => {
   }
 });
 
+/**
+ * 2) /message
+ *  - Receives user input + sessionId
+ *  - Loads chain state from openai.ts
+ *  - Appends user message, invokes chain once
+ *  - Returns the assistant's new response
+ */
 router.post('/message', async (req, res) => {
   try {
-    const { sessionId, message, weatherInfo, location } = req.body;
+    const { sessionId, message } = req.body;
 
     if (!sessionId || !message) {
       return res.status(400).json({ message: 'Session ID and message are required' });
     }
 
-    // Get session context
+    // Confirm the session exists in DB (just for your own tracking)
     const session = await db.query.chatSessions.findFirst({
       where: eq(chatSessions.sessionId, sessionId)
     });
-
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
     }
+    console.log("message in /message: ", message);
 
-    // Generate response
-    const context = {
-      time: new Date().toLocaleTimeString(),
-      weather: weatherInfo,
-      location: location ? `${location.city}, ${location.regionname}` : undefined
-    };
-
-    const response = await generateResponse([
-      { role: 'user', content: message }
-    ], context);
-
-    // Update session if drinks were recommended
-    if (response.drinkSuggestions?.length) {
-      const firstDrink = response.drinkSuggestions[0];
-      await db.update(chatSessions)
-        .set({ selectedDrinkId: firstDrink.id })
-        .where(eq(chatSessions.sessionId, sessionId));
-    }
-
-    res.json(response);
+    // Now let the chain produce the next assistant response.
+    // (We do NOT manually pass an array of messages or context— 
+    //  the chain picks up from its in-memory state using sessionId.)
+    const state = await graph.getState(config);
+    console.log("graph tasks from chat.ts:", state.tasks);
+    await graph.invoke(new Command({ 
+      resume: new HumanMessage(message)}), config);
+    // // Return chain's response
+    // res.json(chainResponse);
   } catch (error) {
     console.error('Error processing message:', error);
     res.status(500).json({ message: 'Failed to process message' });
   }
 });
-
-router.get('/history', async (req, res) => {
-  try {
-    const sessions = await db.query.chatSessions.findMany({
-      with: {
-        selectedDrink: true,
-      },
-      orderBy: [desc(chatSessions.createdAt)],
-      limit: 10,
-    });
-    res.json(sessions);
-  } catch (error) {
-    console.error('Error fetching chat history:', error);
-    res.status(500).json({ message: 'Failed to fetch chat history' });
-  }
-});
-
-export default router;

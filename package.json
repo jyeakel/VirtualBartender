@@ -15,6 +15,7 @@
     "@jridgewell/trace-mapping": "^0.3.25",
     "@langchain/community": "^0.3.22",
     "@langchain/core": "^0.3.27",
+    "@langchain/langgraph": "^0.2.39",
     "@langchain/openai": "^0.3.16",
     "@radix-ui/react-accordion": "^1.2.1",
     "@radix-ui/react-alert-dialog": "^1.1.2",
@@ -79,7 +80,7 @@
     "vaul": "^1.1.0",
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
-    "zod": "^3.23.8"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",

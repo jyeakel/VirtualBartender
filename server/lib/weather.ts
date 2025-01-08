@@ -32,15 +32,33 @@ export async function getWeather(lat: number, lon: number): Promise<string> {
   }
 }
 
-export async function getLocationFromIP(ip: string): Promise<{ 
+// get current time
+
+const getTimeInTimeZone = (timezone: string): string => {
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true, // Optional, depending on your preference
+  };
+
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const currentTime = formatter.format(new Date());
+
+  return currentTime;
+};
+
+export interface CustomLocation {
   regionname: string;
   city: string;
   zip: string;
   timezone: string;
   lat: number;
   lon: number; 
+  time: string;
+}
 
-} | null> {
+export async function getLocationFromIP(ip: string): Promise<CustomLocation | null> {
   try {
     const response = await fetch(`http://ip-api.com/json/${ip}?fields=16888`);
     const data = await response.json();
@@ -52,7 +70,8 @@ export async function getLocationFromIP(ip: string): Promise<{
         zip: data.zip,
         timezone: data.timezone,
         lat: data.lat,
-        lon: data.lon
+        lon: data.lon,
+        time: getTimeInTimeZone(data.timezone)
       };
     }
     return null;
