@@ -4,7 +4,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { optional, z } from 'zod';
 import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
 import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt, Graph } from "@langchain/langgraph";
-import { CustomLocation } from '../lib/weather';
+import { CustomLocation, getWeather } from '../lib/weather';
 import { desc, asc, gt, eq, sql, cosineDistance, jaccardDistance } from 'drizzle-orm';
 import { s } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 import { drinkIngredients } from "@db/schema";
@@ -30,13 +30,18 @@ const query_embedding = new OpenAIEmbeddings({
 // Define the state of the graph
 const GraphState = Annotation.Root({
   ...MessagesAnnotation.spec,
-  context: Annotation<{
-    userMoods: string[];
-    drinkIngredients: string[];
-    userWeather?: string;
-    userTime?: string;
-    userLocation?: CustomLocation | null;
-  }>,
+  userOptions: Annotation<string[]>,
+  userMoods: Annotation<string[]>({
+    reducer: (state: string[], update: string[]) => state.concat(update),
+    default: () => [],
+  }),
+  drinkIngredients: Annotation<string[]>({
+    reducer: (state: string[], update: string[]) => state.concat(update),
+    default: () => [],
+  }),
+  userWeather: Annotation<string>,
+  userLocation: Annotation<string>,
+  userTime: Annotation<string>,
   drink_suggested: Annotation<boolean>,
   drinkSuggestions: Annotation<{
     id: number;
@@ -44,7 +49,6 @@ const GraphState = Annotation.Root({
     description: string;
     reasoning: string;
   }[]>,
-  userOptions: Annotation<string[]>
 });
 
 // use MemorySaver to store the state of the chain
@@ -62,8 +66,6 @@ Always provide exactly 3 options for the user to choose from, keep them declarat
 {
   "message": "conversational response here",
   "options": ["Option 1", "Option 2", "..."],
-  "moods": ["mood1", "mood2", "..."],
-  "drinkIngredients": ["ingredient1", "ingredient2", "..."]
 }`;
 
 // Define the nodes
@@ -72,15 +74,13 @@ async function greetPatron(state: typeof GraphState.State) {
   try {
     const response = await model.invoke([state.messages[0]]);
 
-    const userOptions = response.options;
-
     try {
       return new Command({
         goto:
           "getPatronInput",
         update: {
           messages: [...state.messages, new AIMessage(response.response)],
-          userOptions: response.options
+          userWeather: state.userWeather,
         }
       });
     } catch (e) {
@@ -153,8 +153,10 @@ async function questionPatron(state: typeof GraphState.State) {
   try {
     const response = await model.invoke(messages);
 
-    console.log("questionPatron response:", response);
 
+    console.log("questionPatron response:", response);
+    console.log("state: ", state);
+    
     try {
       const aiMessage = new AIMessage(response.response);
       // Attach options to the message metadata
@@ -164,7 +166,9 @@ async function questionPatron(state: typeof GraphState.State) {
       return new Command({
         goto: "getPatronInput",
         update: {
-          messages: [...state.messages, aiMessage]
+          messages: [...state.messages, aiMessage],
+          drinkIngredients: response.drinkIngredients,
+          userMoods: response.moods
         }
       });
     } catch (e) {
@@ -239,11 +243,19 @@ export async function startConversation(sessionId: string, weather: string, loca
       `),
     new HumanMessage("Hello"),
   ]
-  const response = await graph.invoke({messages: messages}, config);
+  const response = await graph.invoke({messages: messages}, config)
+
+  try {
+    await graph.updateState(config, {
+      userWeather: weather,
+      userLocation: location?.city + ", " + location?.regionname,
+      userTime: location?.time,
+    });
+  } catch (e) {
+  }
   
   return {
     // return the last message in the chain
     messages: response.messages,
-    options: response.userOptions
   };
 }

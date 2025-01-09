@@ -49,7 +49,6 @@ router.post('/start', async (req, res) => {
       sessionId,
       // Return the last message in the chain
       message: response.messages[response.messages.length - 1].content,
-      options: response.options
     });
   } catch (error) {
     console.error('Error starting chat:', error);
