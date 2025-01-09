@@ -40,6 +40,11 @@ export function ChatWindow({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
   const { toast } = useToast();
 
   const scrollToBottom = () => {
@@ -188,6 +193,7 @@ export function ChatWindow({
           <form onSubmit={handleSubmit} className="p-4 border-t border-gray-100">
             <div className="flex gap-2">
               <Input
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Type a message..."

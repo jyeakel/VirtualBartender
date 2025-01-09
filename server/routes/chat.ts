@@ -77,14 +77,11 @@ router.post('/message', async (req, res) => {
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
     }
-    console.log("message in /message: ", message);
 
-    // Get current state and create command to continue graph
-    const state = await graph.getState(config);
+    // Create command to continue graph
     const command = new Command({
       resume: new HumanMessage(message)
     });
-
     const response = await graph.invoke(command, config);
 
     const lastMessage = response.messages[response.messages.length - 1];
@@ -100,18 +97,15 @@ router.post('/message', async (req, res) => {
 router.get('/ingredients', async (req, res) => {
   try {
     const query = req.query.search as string || '';
-    console.log("Ingredients search query:", query);
 
     const sqlQuery = query ? 
       sql`LOWER(name) LIKE LOWER(${'%' + query + '%'})` : 
       undefined;
-    console.log("SQL query:", sqlQuery?.toString());
 
     const ingredients = await db.query.ingredients.findMany({
       where: sqlQuery,
       limit: 50
     });
-    console.log("Found ingredients:", ingredients);
 
     res.json(ingredients);
   } catch (error) {

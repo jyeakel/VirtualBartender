@@ -6,16 +6,28 @@ import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/
 import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt, Graph } from "@langchain/langgraph";
 import { CustomLocation, getWeather } from '../lib/weather';
 import { desc, asc, gt, eq, sql, cosineDistance, jaccardDistance } from 'drizzle-orm';
-import { s } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
+import { c, s } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 import { drinkIngredients } from "@db/schema";
 
-// chat and embedding models
+/**
+ * 1) Define OpenAI details
+ * - Create output schema for structured output using zod 
+ * - Select chat and embedding models
+ * - Draft the system prompt to be used throughout all nodes
+ */
+
 const outputSchema = z.object({
   response: z.string().describe("AIMessage response to the Human"),
-  options: z.string().array().optional().describe("List of user response options the user can choose from"),
+  options: z.string().array().describe("List of user response options the user can choose from"),
   moods: z.string().array().optional().describe("List of moods the user mentioned"),
-  drinkIngredients: z.string().array().optional().describe("List of ingredients the user mentioned")
-
+  drinkIngredients: z.string().array().optional().describe("List of ingredients the user mentioned"),
+  drinkSuggested: z.boolean().optional().describe("Boolean indicating if a drink was suggested"),
+  suggestedDrink: z.object({
+    id: z.number().describe("ID of the suggested drink"),
+    name: z.string().describe("Name of the suggested drink"),
+    description: z.string().describe("Description of the suggested drink"),
+    reasoning: z.string().describe("Reasoning behind the suggested drink"),
+  }).optional().describe("Object containing the suggested drink"),
 })
 
 const model = new ChatOpenAI({
@@ -27,7 +39,24 @@ const query_embedding = new OpenAIEmbeddings({
   modelName: "text-embedding-3-small"
 });
 
-// Define the state of the graph
+const SYSPROMPT = `You are a friendly and knowledgeable virtual bartender interacting with a patron.
+You help the patron find the perfect drink for any occasion based on your conversation with them and other context you have. 
+Below you will be given specific instructions for each phase of the conversation.
+
+IMPORTANT: Respond with valid JSON in the following format. 
+When you are asking a straightforward question, provide exactly 3 options for the patron to choose from, keep them declarative, under 30 characters in length, no punctuation.
+
+{
+  "message": "conversational response here",
+  "options": ["Option 1", "Option 2", "..."],
+}`;
+
+/**
+ * 2) Define graph state
+ * - Use LangGraph annotation to define state and reducers for state fields
+ * - Create checkpointer to store state and config for accessing it
+ */
+
 const GraphState = Annotation.Root({
   ...MessagesAnnotation.spec,
   userOptions: Annotation<string[]>,
@@ -50,7 +79,7 @@ const GraphState = Annotation.Root({
   userWeather: Annotation<string>,
   userLocation: Annotation<string>,
   userTime: Annotation<string>,
-  drink_suggested: Annotation<boolean>,
+  drinkSuggested: Annotation<boolean>,
   drinkSuggestions: Annotation<{
     id: number;
     name: string;
@@ -64,20 +93,12 @@ const checkpointer = new MemorySaver();
 // set config so we can use checkpointing
 export const config = { configurable: { thread_id: "VirtualBartender" } };
 
-const SYSPROMPT = `You are a friendly and knowledgeable virtual bartender.
-You help users find the perfect drink for any occasion based on your conversation with them and other context you have. 
-Below you will be given specific instructions for each phase of the conversation.
 
-IMPORTANT: Respond with valid JSON in the following format. 
-When you are asking a straightforward question, provide exactly 3 options for the user to choose from, keep them declarative, under 30 characters in length, no punctuation.
-If the message you send is more open, don't provide options.
+/**
+ * 3 ) Define graph nodes
+ * - Create async functions for each node in the graph
+ */
 
-{
-  "message": "conversational response here",
-  "options": ["Option 1", "Option 2", "..."],
-}`;
-
-// Define the nodes
 async function greetPatron(state: typeof GraphState.State) {
   console.log("Greeting the patron...");
   const maxRetries = 3;
@@ -124,9 +145,15 @@ async function getPatronInput(state: typeof GraphState.State) {
     });
   }
 
+  // check if it's time to suggest a drink if lengths of userMoods and drinkIngredients are both greater than 4
+  console.log(`userMoods length: ${state.userMoods.length}: ${state.userMoods} \n
+    drinkIngredients length: ${state.drinkIngredients.length}: ${state.drinkIngredients} `)
+   const nextGoto = state.userMoods.length > 4 && state.drinkIngredients.length > 4 ? "makeRecommendation" : "questionPatron";
+   console.log(`Next goto: ${nextGoto}`)
+
   // If this is a user message, continue to next node
   return new Command({
-    goto: "questionPatron",
+    goto: nextGoto,
     update: {
       messages: state.messages,
     }
@@ -143,24 +170,23 @@ async function questionPatron(state: typeof GraphState.State) {
   const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
       PHASE 2:
       (You can disregard the previous instructions that were given under the heading PHASE 1)
-      Ask questions to determine the patron's mood, their target vibe, and their preferences all with the goal of finding the perfect cocktail for them.
+      Ask questions to determine the patron's personality, mood, target vibe, and preferences all with the goal of finding the perfect cocktail for them. 
+      Be creative in prompting them with questions to get them to open up about their mood and preferences, and read between the lines of their tone.
+      Make absolutely certain you follow the CRITICAL RULES below for every response.
 
-      In your JSON formatted responses, include two additional list fields: "moods" and "ingredients" to store the user's responses.
-      Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic").
+      In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
+      Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
 
-      DO:
-      * Always end your response with a question to prompt the user to respond.
-      * When you ask about ingredients, ALWAYS include ONLY ONE option that lets them choose ingredients and this must always include the word "ingredients".
-      * Be creative in prompting them with questions to get them to open up about their mood and preferences, and read between the lines of their tone.
-      * Ask follow up questions, to refine your understanding of their personality and preferences.
-      * Keep in mind their location, weather, and local time we already established as you think through appropp.
-
-      DO NOT:
-      * Suggest any specific cocktails at this phase
-      * Use the word "ingredients" in any other context than the one option
-      * Use the word "ingredients" in the context of the user letting you decide what to include in their drink (Don't say "surprise me with ingredients", "you choose the ingredients", etc.)
-      * Ask about drink preparation or anything beyond flavors or ingredients
-      * Ask about non-alcoholic or any non cocktail drinks, we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
+      CRITICAL RULES:
+      * Always end your response with a question to prompt the patron to respond.
+      * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
+      * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
+      * Do not use the word "ingredients" in more than one option for any option set
+      * Do not use the word "ingredients" for an option where the patron wants you decide what to include in their drink (i.e., do not return options like: "surprise me with ingredients", "you choose the ingredients", etc.)
+      * Do not ask about drink preparation preferences or how the cocktail is served (e.g. "shaken or stirred?", "what type of glass do you prefer?")
+      * Do not ask about allergies or dietary restrictions
+      * Do not ask about non-alcoholic or any non cocktail drinks, as we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
+      * Do not suggest any specific cocktails at this phase
       `
   const messages = [
     new SystemMessage(QUESTION_SYS_PROMPT),
@@ -170,17 +196,18 @@ async function questionPatron(state: typeof GraphState.State) {
 
   try {
     const response = await model.invoke(messages);
-
-
-    console.log("questionPatron response:", response);
-    console.log("state: ", state);
-
+    // discard the response and call model.invoke again if the response from the model is the same as the last user message
+    if (response.response === state.messages[state.messages.length - 1].content) {
+      console.log("Model response is the same as the last user message, retrying...");
+      return new Command({
+        goto: "questionPatron",
+      });
+    }  
     try {
       const aiMessage = new AIMessage(response.response);
       // Attach options to the message metadata
       (aiMessage as any).options = response.options;
-      (aiMessage as any).moods = response.moods;
-      (aiMessage as any).drinkIngredients = response.drinkIngredients;
+
       // make all drink ingredients lowercase if it exists
       if (response.drinkIngredients) {
         response.drinkIngredients = response.drinkIngredients.map((ingredient: string) => ingredient.toLowerCase());
@@ -210,20 +237,44 @@ async function questionPatron(state: typeof GraphState.State) {
   }
 }
 
-async function getIngredients(state: typeof GraphState.State) {
-  // stub of function, just pass state to next node
-  return new Command({
-    goto: "questionPatron",
-    update: state
-  });
-}
+async function makeRecommendation(state: typeof GraphState.State)  {
+  // We'll instruct the model to ask user about mood/ingredients
+  console.log("Making recommendations...");
 
-async function makeRecommendation(state: typeof GraphState.State) {
-  // stub of function, just pass state to next node
-  return new Command({
-    goto: END,
-    update: state
-  });
+  // Add logic that looks at current state of context and determines if it's enough to move to receommendation
+
+
+  const REC_SYS_PROMPT = `${SYSPROMPT}\n\n
+      PHASE 3:
+      (You can disregard the previous instructions that were given under the headings PHASE 1 and PHASE 2 in previous messages)
+      
+
+      In your JSON formatted responses, include two additional list fields: boolean "drinkSuggested" and the object "suggestedDrink" to store the patron's responses.
+      Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
+
+      CRITICAL RULES:
+      * Always end your response with a question to prompt the patron to respond.
+      * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
+      * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
+      * Do not use the word "ingredients" in more than one option for any option set
+      * Do not use the word "ingredients" for an option where the patron wants you decide what to include in their drink (i.e., do not return options like: "surprise me with ingredients", "you choose the ingredients", etc.)
+      * Do not ask about drink preparation preferences or how the cocktail is served (e.g. "shaken or stirred?", "what type of glass do you prefer?")
+      * Do not ask about allergies or dietary restrictions
+      * Do not ask about non-alcoholic or any non cocktail drinks, as we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
+      * Do not suggest any specific cocktails at this phase
+      `
+  const messages = [
+    new SystemMessage(REC_SYS_PROMPT),
+    new HumanMessage(state.messages[state.messages.length - 1]),
+    ...state.messages
+  ];
+
+  try {
+    console.log(state.messages[state.messages.length - 1])
+  } catch (error) {
+    console.error('LangChain API error:', error);
+    throw error;
+  }
 }
 
 export const graph = new StateGraph(GraphState)
@@ -238,14 +289,14 @@ export const graph = new StateGraph(GraphState)
     ends: ["questionPatron", "makeRecommendation"]
   })
   .addNode("makeRecommendation", makeRecommendation, {
-    ends: ["questionPatron", END]
+    ends: [END]
   })
 
 // Basic edges for multi-turn
 .addEdge(START, "greetPatron")
 .addEdge("greetPatron", "getPatronInput")
-.addEdge("getPatronInput", "questionPatron")
 .addEdge("questionPatron", "getPatronInput")
+.addEdge("getPatronInput", "questionPatron")
 .addEdge("getPatronInput", "makeRecommendation")
 .addEdge("makeRecommendation", END)
 
@@ -254,9 +305,7 @@ export const graph = new StateGraph(GraphState)
   checkpointer
 });
 
-/**
- * Called once to start a brand-new conversation.
- */
+// Start the conversation
 export async function startConversation(sessionId: string, weather: string, location: CustomLocation | null) {
   console.log("Starting conversation with sessionId =", sessionId);
 
@@ -268,7 +317,7 @@ export async function startConversation(sessionId: string, weather: string, loca
 
       DO:
       * Make passing reference to exactly one of: (${location?.city}, ${location?.regionname}), weather situation (${weather}), or time of day ${location?.time}.
-      * Don't ask them about their mood or favorite drinks yet.
+      * Don't ask the patron about their mood or favorite drinks yet.
 
       DO NOT:
       * Pretend that you are in the same physical space with them or live in their city (you are a virtual bartender).
@@ -277,19 +326,20 @@ export async function startConversation(sessionId: string, weather: string, loca
       `),
     new HumanMessage("Hello"),
   ]
- const response = await graph.invoke({messages: messages}, config)
+  // Invoke the graph to start the wofkflow starting at the greetPatron node
+  const response = await graph.invoke({messages: messages}, config)
 
+  // Update the state with the user's location and weather for use in the initial welcome message
   try {
     await graph.updateState(config, {
       userWeather: weather,
       userLocation: location?.city + ", " + location?.regionname,
       userTime: location?.time,
     });
-  } catch (e) {
-  }
+  } catch (e) {}
 
   return {
-    // return the last message in the chain
+    // return the AI's greeting message
     messages: response.messages,
   };
 }
