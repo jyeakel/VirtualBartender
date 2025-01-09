@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { startConversation, generateResponse, config, graph} from '../lib/openai';
+import { startConversation, config, graph} from '../lib/openai';
 import { Command} from "@langchain/langgraph";
 import { getWeather, getLocationFromIP, CustomLocation } from '../lib/weather';
 import { db } from '@db';
@@ -81,15 +81,19 @@ router.post('/message', async (req, res) => {
     }
     console.log("message in /message: ", message);
 
-    // Now let the chain produce the next assistant response.
-    // (We do NOT manually pass an array of messages or context— 
-    //  the chain picks up from its in-memory state using sessionId.)
+    // Get current state and create command to continue graph
     const state = await graph.getState(config);
-    console.log("graph tasks from chat.ts:", state.tasks);
-    await graph.invoke(new Command({ 
-      resume: new HumanMessage(message)}), config);
-    // // Return chain's response
-    // res.json(chainResponse);
+    const command = new Command({
+      resume: new HumanMessage(message)
+    });
+        
+    const response = await graph.invoke(command, config);
+
+    const lastMessage = response.messages[response.messages.length - 1];
+    res.json({
+      message: lastMessage.content,
+      options: (lastMessage as any).options || []
+    });
   } catch (error) {
     console.error('Error processing message:', error);
     res.status(500).json({ message: 'Failed to process message' });
