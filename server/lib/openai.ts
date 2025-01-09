@@ -12,7 +12,7 @@ import { drinkIngredients } from "@db/schema";
 // chat and embedding models
 const outputSchema = z.object({
   response: z.string().describe("AIMessage response to the Human"),
-  options: z.string().array().describe("List of user response options the user can choose from"),
+  options: z.string().array().optional().describe("List of user response options the user can choose from"),
   moods: z.string().array().optional().describe("List of moods the user mentioned"),
   drinkIngredients: z.string().array().optional().describe("List of ingredients the user mentioned")
 
@@ -69,7 +69,8 @@ You help users find the perfect drink for any occasion based on your conversatio
 Below you will be given specific instructions for each phase of the conversation.
 
 IMPORTANT: Respond with valid JSON in the following format. 
-Always provide exactly 3 options for the user to choose from, keep them declarative, under 30 characters in length, no punctuation:
+When you are asking a straightforward question, provide exactly 3 options for the user to choose from, keep them declarative, under 30 characters in length, no punctuation.
+If the message you send is more open, don't provide options.
 
 {
   "message": "conversational response here",
@@ -148,12 +149,16 @@ async function questionPatron(state: typeof GraphState.State) {
       Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic").
 
       DO:
-      * When you ask about ingredients, ALWAYS include a single option that lets them choose or alter their preferred ingredients and this must always include the word "ingredients".
-      * Be creative in prompting them with questions to get them to open up about their mood and preferences.
+      * Always end your response with a question to prompt the user to respond.
+      * When you ask about ingredients, ALWAYS include ONLY ONE option that lets them choose ingredients and this must always include the word "ingredients".
+      * Be creative in prompting them with questions to get them to open up about their mood and preferences, and read between the lines of their tone.
+      * Ask follow up questions, to refine your understanding of their personality and preferences.
       * Keep in mind their location, weather, and local time we already established as you think through appropp.
 
       DO NOT:
       * Suggest any specific cocktails at this phase
+      * Use the word "ingredients" in any other context than the one option
+      * Use the word "ingredients" in the context of the user letting you decide what to include in their drink (Don't say "surprise me with ingredients", "you choose the ingredients", etc.)
       * Ask about drink preparation or anything beyond flavors or ingredients
       * Ask about non-alcoholic or any non cocktail drinks, we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
       `

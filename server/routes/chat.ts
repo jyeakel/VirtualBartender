@@ -3,9 +3,8 @@ import { startConversation, config, graph} from '../lib/openai';
 import { Command} from "@langchain/langgraph";
 import { getWeather, getLocationFromIP, CustomLocation } from '../lib/weather';
 import { db } from '@db';
-import { chatSessions } from '@db/schema';
-import { desc } from 'drizzle-orm';
-import { eq } from 'drizzle-orm';
+import { chatSessions, ingredients } from '@db/schema';
+import { desc, eq, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { HumanMessage } from '@langchain/core/messages';
 
@@ -23,7 +22,7 @@ router.post('/start', async (req, res) => {
   try {
     console.log('Starting new chat session...');
     const sessionId = uuidv4();
-    
+
     // get user location + weather
     // const clientIp = req.ip || req.socket.remoteAddress || '';
     const clientIp = '67.245.228.183' // Example IP
@@ -85,7 +84,7 @@ router.post('/message', async (req, res) => {
     const command = new Command({
       resume: new HumanMessage(message)
     });
-        
+
     const response = await graph.invoke(command, config);
 
     const lastMessage = response.messages[response.messages.length - 1];
@@ -96,5 +95,28 @@ router.post('/message', async (req, res) => {
   } catch (error) {
     console.error('Error processing message:', error);
     res.status(500).json({ message: 'Failed to process message' });
+  }
+});
+router.get('/ingredients', async (req, res) => {
+  try {
+    const query = req.query.search as string || '';
+    console.log("Ingredients search query:", query);
+
+    const sqlQuery = query ? 
+      sql`LOWER(name) LIKE LOWER(${'%' + query + '%'})` : 
+      undefined;
+    console.log("SQL query:", sqlQuery?.toString());
+
+    const ingredients = await db.query.ingredients.findMany({
+      where: sqlQuery,
+      limit: 50
+    });
+    console.log("Found ingredients:", ingredients);
+
+    res.json(ingredients);
+  } catch (error) {
+    console.error('Error fetching ingredients:', error);
+    console.error('Error details:', error instanceof Error ? error.message : error);
+    res.status(500).json({ message: 'Failed to fetch ingredients' });
   }
 });

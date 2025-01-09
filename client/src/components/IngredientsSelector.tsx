@@ -1,10 +1,16 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, X } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { useDebounce } from "../hooks/use-debounce";
+
+interface Ingredient {
+  id: number;
+  name: string;
+}
 
 interface IngredientsSelectorProps {
   onClose: () => void;
@@ -12,19 +18,28 @@ interface IngredientsSelectorProps {
   initialIngredients?: string[];
 }
 
-const INGREDIENTS = [
-  "Vodka", "Gin", "Rum", "Tequila", "Whiskey", "Triple Sec", "Lime Juice",
-  "Lemon Juice", "Orange Juice", "Cranberry Juice", "Tonic Water", "Club Soda",
-  "Cola", "Simple Syrup", "Vermouth", "Bitters", "Mint", "Sugar"
-]; // This list should be expanded with your complete ingredients
-
 export function IngredientsSelector({ onClose, onSubmit, initialIngredients }: IngredientsSelectorProps) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>(initialIngredients || []);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const debouncedSearch = useDebounce(search, 300);
 
-  const filteredIngredients = INGREDIENTS.filter(i => 
-    i.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (debouncedSearch) {
+          params.append('search', debouncedSearch);
+        }
+        const response = await fetch(`/api/ingredients?${params}`);
+        const data = await response.json();
+        setIngredients(data);
+      } catch (error) {
+        console.error('Error fetching ingredients:', error);
+      }
+    };
+    fetchIngredients();
+  }, [debouncedSearch]);
 
   const toggleIngredient = (ingredient: string) => {
     setSelected(prev => 
@@ -74,22 +89,22 @@ export function IngredientsSelector({ onClose, onSubmit, initialIngredients }: I
 
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-2">
-          {filteredIngredients.map(ingredient => (
+          {ingredients.map(ingredient => (
             <div
-              key={ingredient}
-              onClick={() => toggleIngredient(ingredient)}
+              key={ingredient.id}
+              onClick={() => toggleIngredient(ingredient.name)}
               className={`
                 flex items-center gap-2 p-2 rounded-md cursor-pointer
-                ${selected.includes(ingredient) ? 'bg-primary/10' : 'hover:bg-secondary/80'}
+                ${selected.includes(ingredient.name) ? 'bg-primary/10' : 'hover:bg-secondary/80'}
               `}
             >
               <div className={`
                 w-4 h-4 rounded border flex items-center justify-center
-                ${selected.includes(ingredient) ? 'bg-primary border-primary' : 'border-gray-300'}
+                ${selected.includes(ingredient.name) ? 'bg-primary border-primary' : 'border-gray-300'}
               `}>
-                {selected.includes(ingredient) && <Check className="h-3 w-3 text-white" />}
+                {selected.includes(ingredient.name) && <Check className="h-3 w-3 text-white" />}
               </div>
-              {ingredient}
+              {ingredient.name}
             </div>
           ))}
         </div>
