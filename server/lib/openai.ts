@@ -15,7 +15,7 @@ const outputSchema = z.object({
   options: z.string().array().describe("List of user response options the user can choose from"),
   moods: z.string().array().optional().describe("List of moods the user mentioned"),
   drinkIngredients: z.string().array().optional().describe("List of ingredients the user mentioned")
-  
+
 })
 
 const model = new ChatOpenAI({
@@ -32,11 +32,19 @@ const GraphState = Annotation.Root({
   ...MessagesAnnotation.spec,
   userOptions: Annotation<string[]>,
   userMoods: Annotation<string[]>({
-    reducer: (state: string[], update: string[]) => state.concat(update),
+    reducer: (state: string[], update: string[] | undefined) => {
+      if (!update) return state;
+      const filtered = update.filter(x => x !== undefined);
+      return [...new Set([...state, ...filtered])];
+    },
     default: () => [],
   }),
   drinkIngredients: Annotation<string[]>({
-    reducer: (state: string[], update: string[]) => state.concat(update),
+    reducer: (state: string[], update: string[] | undefined) => {
+      if (!update) return state;
+      const filtered = update.filter(x => x !== undefined);
+      return [...new Set([...state, ...filtered])];
+    },
     default: () => [],
   }),
   userWeather: Annotation<string>,
@@ -71,10 +79,10 @@ Always provide exactly 3 options for the user to choose from, keep them declarat
 // Define the nodes
 async function greetPatron(state: typeof GraphState.State) {
   console.log("Greeting the patron...");
-  try {
-    const response = await model.invoke([state.messages[0]]);
-
+  const maxRetries = 3;
+  for (let attempts = 1; attempts <= maxRetries; attempts++) {
     try {
+      const response = await model.invoke([state.messages[0]]);
       return new Command({
         goto:
           "getPatronInput",
@@ -84,22 +92,26 @@ async function greetPatron(state: typeof GraphState.State) {
         }
       });
     } catch (e) {
-      console.error("Some error occurred", e);
-      return {
-        messages: { role: "assistant", content: "I'm having trouble understanding you. Can you try again?" },
-        options: ["Start Over", "Try Different Approach"]
-      };
+      if (attempts === maxRetries) {
+        console.error("Max retry attempts reached:", e);
+        return new Command({
+          goto: "getPatronInput",
+          update: {
+            messages: [...state.messages, new AIMessage("Hi! I'd be happy to help you find the perfect drink today. What brings you in?")],
+            userWeather: state.userWeather,
+          }
+        });
+      }
+      console.error(`Attempt ${attempts} failed:`, e);
+      continue;
     }
-  } catch (error) {
-    console.error('LangChain API error:', error);
-    throw error;
   }
 }
 
 async function getPatronInput(state: typeof GraphState.State) {
   console.log("Getting patron input...");
   const lastMessage = state.messages[state.messages.length - 1];
-  
+
   // If this is an AI message, interrupt for user input
   if (lastMessage instanceof AIMessage) {
     const value = await interrupt(lastMessage.content);
@@ -110,7 +122,7 @@ async function getPatronInput(state: typeof GraphState.State) {
       }
     });
   }
-  
+
   // If this is a user message, continue to next node
   return new Command({
     goto: "questionPatron",
@@ -136,9 +148,10 @@ async function questionPatron(state: typeof GraphState.State) {
       Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic").
 
       DO:
+      * When you ask about ingredients, ALWAYS include a single option that lets them choose or alter their preferred ingredients and this must always include the word "ingredients".
       * Be creative in prompting them with questions to get them to open up about their mood and preferences.
       * Keep in mind their location, weather, and local time we already established as you think through appropp.
-      
+
       DO NOT:
       * Suggest any specific cocktails at this phase
       * Ask about drink preparation or anything beyond flavors or ingredients
@@ -156,13 +169,21 @@ async function questionPatron(state: typeof GraphState.State) {
 
     console.log("questionPatron response:", response);
     console.log("state: ", state);
-    
+
     try {
       const aiMessage = new AIMessage(response.response);
       // Attach options to the message metadata
       (aiMessage as any).options = response.options;
       (aiMessage as any).moods = response.moods;
       (aiMessage as any).drinkIngredients = response.drinkIngredients;
+      // make all drink ingredients lowercase if it exists
+      if (response.drinkIngredients) {
+        response.drinkIngredients = response.drinkIngredients.map((ingredient: string) => ingredient.toLowerCase());
+      }
+       // make all moods lowercase if it exists
+      if (response.moods) {
+        response.moods = response.moods.map((mood: string) => mood.toLowerCase());
+      }
       return new Command({
         goto: "getPatronInput",
         update: {
@@ -182,6 +203,14 @@ async function questionPatron(state: typeof GraphState.State) {
     console.error('LangChain API error:', error);
     throw error;
   }
+}
+
+async function getIngredients(state: typeof GraphState.State) {
+  // stub of function, just pass state to next node
+  return new Command({
+    goto: "questionPatron",
+    update: state
+  });
 }
 
 async function makeRecommendation(state: typeof GraphState.State) {
@@ -225,7 +254,7 @@ export const graph = new StateGraph(GraphState)
  */
 export async function startConversation(sessionId: string, weather: string, location: CustomLocation | null) {
   console.log("Starting conversation with sessionId =", sessionId);
-  
+
   const messages = [
     new SystemMessage(
       `${SYSPROMPT}\n\n
@@ -235,7 +264,7 @@ export async function startConversation(sessionId: string, weather: string, loca
       DO:
       * Make passing reference to exactly one of: (${location?.city}, ${location?.regionname}), weather situation (${weather}), or time of day ${location?.time}.
       * Don't ask them about their mood or favorite drinks yet.
-      
+
       DO NOT:
       * Pretend that you are in the same physical space with them or live in their city (you are a virtual bartender).
       * Directly say the temperature or time unless it is especially notable
@@ -243,7 +272,7 @@ export async function startConversation(sessionId: string, weather: string, loca
       `),
     new HumanMessage("Hello"),
   ]
-  const response = await graph.invoke({messages: messages}, config)
+ const response = await graph.invoke({messages: messages}, config)
 
   try {
     await graph.updateState(config, {
@@ -253,7 +282,7 @@ export async function startConversation(sessionId: string, weather: string, loca
     });
   } catch (e) {
   }
-  
+
   return {
     // return the last message in the chain
     messages: response.messages,

@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Send } from "lucide-react";
 import { DrinkCard } from "./DrinkCard";
 import { IngredientsSelector } from "./IngredientsSelector";
+import { stringToBytes } from "node_modules/uuid/dist/esm-browser/v35";
 
 export interface Message {
   role: "user" | "assistant";
@@ -103,7 +104,7 @@ export function ChatWindow({
   };
 
   const handleOptionClick = async (option: string) => {
-    if (option === "I want a drink with specific ingredients") {
+    if (option.includes("ingredients")) {
       setShowIngredients(true);
     } else {
       setMessages(prev => [...prev, { role: "user", content: option }]);
@@ -217,9 +218,9 @@ export function ChatWindow({
               setSelectedIngredients(ingredients);
               setMessages(prev => [...prev, { 
                 role: "user", 
-                content: `I have these ingredients: ${ingredients.join(", ")}` 
+                content: `Here are my ingredients: ${ingredients.join(", ")}` 
               }]);
-              await sendMessage(`I have these ingredients: ${ingredients.join(", ")}`);
+              await sendMessage(`Here are my ingredients: ${ingredients.join(", ")}`);
             }}
           />
         </div>
