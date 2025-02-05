@@ -116,6 +116,9 @@ export type SelectChatSession = typeof chatSessions.$inferSelect;
 export const embeddings = pgTable("embeddings", {
   id: serial("id").primaryKey(),
   drinkId: integer("drink_id").references(() => drinks.id),
+  drinkName: text("drink_name"),
+  tags: text("tags"),
+  ingredients: text("ingredients"),
   embedding: vector("embedding", { dimensions: 1536 }), // OpenAI's default embedding size
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

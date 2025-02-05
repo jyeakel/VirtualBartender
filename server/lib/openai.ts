@@ -4,10 +4,16 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { optional, z } from 'zod';
 import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
 import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt, Graph } from "@langchain/langgraph";
+import { tool } from "@langchain/core/tools";
+import { ToolNode, toolsCondition } from "@langchain/langgraph/prebuilt";
 import { CustomLocation, getWeather } from '../lib/weather';
 import { desc, asc, gt, eq, sql, cosineDistance, jaccardDistance } from 'drizzle-orm';
 import { c, s } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
+import { db } from '@db';
 import { drinkIngredients } from "@db/schema";
+import { embeddings } from '@db/schema';
+import { drizzle } from "drizzle-orm/node-postgres";
+import { queryOptions } from "@tanstack/react-query";
 
 /**
  * 1) Define OpenAI details
@@ -15,6 +21,9 @@ import { drinkIngredients } from "@db/schema";
  * - Select chat and embedding models
  * - Draft the system prompt to be used throughout all nodes
  */
+
+const moodTotal = 1;
+const ingredientTotal = 1;
 
 const outputSchema = z.object({
   response: z.string().describe("AIMessage response to the Human"),
@@ -33,11 +42,17 @@ const outputSchema = z.object({
 const model = new ChatOpenAI({
   modelName: "gpt-4",
   temperature: 0.4
-}).withStructuredOutput(outputSchema);
+}).withStructuredOutput(outputSchema)
 
 const query_embedding = new OpenAIEmbeddings({
   modelName: "text-embedding-3-small"
 });
+
+const generateEmbedding = async (query: string): Promise<number[]> => {
+  const input = query.replaceAll('\n', ' ');
+  const embedding = await query_embedding.embedQuery(input)
+  return embedding;
+}; 
 
 const SYSPROMPT = `You are a friendly and knowledgeable virtual bartender interacting with a patron.
 You help the patron find the perfect drink for any occasion based on your conversation with them and other context you have. 
@@ -137,40 +152,26 @@ async function getPatronInput(state: typeof GraphState.State) {
   // If this is an AI message, interrupt for user input
   if (lastMessage instanceof AIMessage) {
     const value = await interrupt(lastMessage.content);
+    console.log(`userMoods length: ${state.userMoods.length}: ${state.userMoods.join(", ")} \n drinkIngredients length: ${state.drinkIngredients.length}: ${state.drinkIngredients.join(", ")}`)
+    const nextGoto = state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal ? "makeRecommendation" : "questionPatron";
+    console.log(`Next goto: ${nextGoto}`)
     return new Command({
-      goto: "questionPatron",
+      goto: nextGoto,
       update: {
         messages: [...state.messages, value]
       }
     });
   }
-
-  // check if it's time to suggest a drink if lengths of userMoods and drinkIngredients are both greater than 4
-  console.log(`userMoods length: ${state.userMoods.length}: ${state.userMoods} \n
-    drinkIngredients length: ${state.drinkIngredients.length}: ${state.drinkIngredients} `)
-   const nextGoto = state.userMoods.length > 4 && state.drinkIngredients.length > 4 ? "makeRecommendation" : "questionPatron";
-   console.log(`Next goto: ${nextGoto}`)
-
-  // If this is a user message, continue to next node
-  return new Command({
-    goto: nextGoto,
-    update: {
-      messages: state.messages,
-    }
-  });
 }
 
 async function questionPatron(state: typeof GraphState.State) {
   // We'll instruct the model to ask user about mood/ingredients
   console.log("Questioning patron...");
 
-  // Add logic that looks at current state of context and determines if it's enough to move to receommendation
-
-
   const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
       PHASE 2:
       (You can disregard the previous instructions that were given under the heading PHASE 1)
-      Ask questions to determine the patron's personality, mood, target vibe, and preferences all with the goal of finding the perfect cocktail for them. 
+      Ask questions to determine the patron's personality, mood, target vibe, and taste preferences all with the goal of finding the perfect cocktail for them. 
       Be creative in prompting them with questions to get them to open up about their mood and preferences, and read between the lines of their tone.
       Make absolutely certain you follow the CRITICAL RULES below for every response.
 
@@ -240,40 +241,30 @@ async function questionPatron(state: typeof GraphState.State) {
 async function makeRecommendation(state: typeof GraphState.State)  {
   // We'll instruct the model to ask user about mood/ingredients
   console.log("Making recommendations...");
+  
+  if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
+    console.log('do we get here?')
+    const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
+    const REC_SYS_PROMPT = `${SYSPROMPT}\n\n
+        PHASE 3:
+        (You can disregard the previous instructions that were given under the headings PHASE 1 and PHASE 2 in previous messages)
+        
+        Suggest a drink from ${drinkRecommendations} and give a good explanation for why you recommend it.
 
-  // Add logic that looks at current state of context and determines if it's enough to move to receommendation
-
-
-  const REC_SYS_PROMPT = `${SYSPROMPT}\n\n
-      PHASE 3:
-      (You can disregard the previous instructions that were given under the headings PHASE 1 and PHASE 2 in previous messages)
-      
-
-      In your JSON formatted responses, include two additional list fields: boolean "drinkSuggested" and the object "suggestedDrink" to store the patron's responses.
-      Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
-
-      CRITICAL RULES:
-      * Always end your response with a question to prompt the patron to respond.
-      * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
-      * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
-      * Do not use the word "ingredients" in more than one option for any option set
-      * Do not use the word "ingredients" for an option where the patron wants you decide what to include in their drink (i.e., do not return options like: "surprise me with ingredients", "you choose the ingredients", etc.)
-      * Do not ask about drink preparation preferences or how the cocktail is served (e.g. "shaken or stirred?", "what type of glass do you prefer?")
-      * Do not ask about allergies or dietary restrictions
-      * Do not ask about non-alcoholic or any non cocktail drinks, as we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
-      * Do not suggest any specific cocktails at this phase
-      `
-  const messages = [
-    new SystemMessage(REC_SYS_PROMPT),
-    new HumanMessage(state.messages[state.messages.length - 1]),
-    ...state.messages
-  ];
-
-  try {
-    console.log(state.messages[state.messages.length - 1])
-  } catch (error) {
-    console.error('LangChain API error:', error);
-    throw error;
+        CRITICAL RULES:
+        * Say goodbye after you've made the recommendation
+        `
+    const messages = [
+      new SystemMessage(REC_SYS_PROMPT),
+      new HumanMessage(state.messages[state.messages.length - 1]),
+      ...state.messages
+    ];
+    try {
+      console.log(state.messages[state.messages.length - 1])
+    } catch (error) {
+      console.error('LangChain API error:', error);
+      throw error;
+    }
   }
 }
 
@@ -296,7 +287,6 @@ export const graph = new StateGraph(GraphState)
 .addEdge(START, "greetPatron")
 .addEdge("greetPatron", "getPatronInput")
 .addEdge("questionPatron", "getPatronInput")
-.addEdge("getPatronInput", "questionPatron")
 .addEdge("getPatronInput", "makeRecommendation")
 .addEdge("makeRecommendation", END)
 
@@ -343,3 +333,17 @@ export async function startConversation(sessionId: string, weather: string, loca
     messages: response.messages,
   };
 }
+
+const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<string>) => {
+  const query = `Ingredients: ${ingredients.join(", ")} Mood: ${moods.join(", ")}`
+  const embedding = await generateEmbedding(query);
+  const similarity = sql<number>`1 - (${cosineDistance(embeddings.embedding, embedding)})`;
+  const RecommendedDrinks = await db
+    .select({ id: embeddings.drinkId, name: embeddings.drinkName, ingredients: embeddings.ingredients, tags: embeddings.tags, similarity })
+    .from(embeddings)
+    .where(gt(similarity, 0.5))
+    .orderBy((t) => desc(t.similarity))
+    .limit(4);
+    console.log(RecommendedDrinks)
+  return RecommendedDrinks;
+};
