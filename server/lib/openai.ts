@@ -1,19 +1,12 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { optional, z } from 'zod';
+import { z } from 'zod';
 import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
 import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt, Graph } from "@langchain/langgraph";
-import { tool } from "@langchain/core/tools";
-import { ToolNode, toolsCondition } from "@langchain/langgraph/prebuilt";
 import { CustomLocation, getWeather } from '../lib/weather';
-import { desc, asc, gt, eq, sql, cosineDistance, jaccardDistance } from 'drizzle-orm';
-import { c, s } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
+import { desc, sql, cosineDistance, l1Distance } from 'drizzle-orm';
 import { db } from '@db';
-import { drinkIngredients } from "@db/schema";
 import { embeddings } from '@db/schema';
-import { drizzle } from "drizzle-orm/node-postgres";
-import { queryOptions } from "@tanstack/react-query";
 
 /**
  * 1) Define OpenAI details
@@ -45,7 +38,7 @@ const model = new ChatOpenAI({
 }).withStructuredOutput(outputSchema)
 
 const query_embedding = new OpenAIEmbeddings({
-  modelName: "text-embedding-3-small"
+  modelName: "text-embedding-ada-002"
 });
 
 const generateEmbedding = async (query: string): Promise<number[]> => {
@@ -171,13 +164,15 @@ async function questionPatron(state: typeof GraphState.State) {
   const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
       PHASE 2:
       (You can disregard the previous instructions that were given under the heading PHASE 1)
-      Ask questions to determine the patron's personality, mood, target vibe, and taste preferences all with the goal of finding the perfect cocktail for them. 
-      Be creative in prompting them with questions to get them to open up about their mood and preferences, and read between the lines of their tone.
+      Ask questions to determine the patron's personality, mood, target vibe, and taste preferences with the goal of finding the perfect cocktail for them. 
+      Prompt them with questions that  tell you something about their mood and drink/flavor preferences, and read between the lines of their tone to assess mood.
       Make absolutely certain you follow the CRITICAL RULES below for every response.
 
-      In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
-      Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
+      Ask about whatever you know less about. Right now you know ${state.drinkIngredients.length} things about ingredients, and ${state.userMoods.length} things about the patron's mood or vibe.
 
+      In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
+      Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses and demeanor to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
+      
       CRITICAL RULES:
       * Always end your response with a question to prompt the patron to respond.
       * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
@@ -191,7 +186,6 @@ async function questionPatron(state: typeof GraphState.State) {
       `
   const messages = [
     new SystemMessage(QUESTION_SYS_PROMPT),
-    new HumanMessage(state.messages[state.messages.length - 1]),
     ...state.messages
   ];
 
@@ -245,22 +239,30 @@ async function makeRecommendation(state: typeof GraphState.State)  {
   if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
     console.log('do we get here?')
     const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
-    const REC_SYS_PROMPT = `${SYSPROMPT}\n\n
+    const REC_SYS_PROMPT = `${SYSPROMPT} \n\n
         PHASE 3:
-        (You can disregard the previous instructions that were given under the headings PHASE 1 and PHASE 2 in previous messages)
-        
-        Suggest a drink from ${drinkRecommendations} and give a good explanation for why you recommend it.
+        Suggest one drink from one of the options below to your patron:
+        ${drinkRecommendations}
 
         CRITICAL RULES:
+        * Always suggest a drink from the provided options
+        * Come up with an explanation for why this drink makes sense for them based on the information you know about them
         * Say goodbye after you've made the recommendation
         `
     const messages = [
       new SystemMessage(REC_SYS_PROMPT),
-      new HumanMessage(state.messages[state.messages.length - 1]),
       ...state.messages
     ];
     try {
       console.log(state.messages[state.messages.length - 1])
+    } catch (error) {
+      console.error('LangChain API error:', error);
+      throw error;
+    }
+    try {
+      console.log("Try response from recommendation node")
+      const response = await model.invoke(messages);
+      console.log(response)
     } catch (error) {
       console.error('LangChain API error:', error);
       throw error;
@@ -336,14 +338,14 @@ export async function startConversation(sessionId: string, weather: string, loca
 
 const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<string>) => {
   const query = `Ingredients: ${ingredients.join(", ")} Mood: ${moods.join(", ")}`
+  console.log("Search query for embeddings:", query);
   const embedding = await generateEmbedding(query);
   const similarity = sql<number>`1 - (${cosineDistance(embeddings.embedding, embedding)})`;
   const RecommendedDrinks = await db
     .select({ id: embeddings.drinkId, name: embeddings.drinkName, ingredients: embeddings.ingredients, tags: embeddings.tags, similarity })
     .from(embeddings)
-    .where(gt(similarity, 0.5))
     .orderBy((t) => desc(t.similarity))
     .limit(4);
-    console.log(RecommendedDrinks)
+  console.log(RecommendedDrinks)
   return RecommendedDrinks;
 };
