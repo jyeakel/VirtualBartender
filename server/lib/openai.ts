@@ -24,12 +24,6 @@ const outputSchema = z.object({
   moods: z.string().array().optional().describe("List of moods the user mentioned"),
   drinkIngredients: z.string().array().optional().describe("List of ingredients the user mentioned"),
   drinkSuggested: z.boolean().optional().describe("Boolean indicating if a drink was suggested"),
-  suggestedDrink: z.object({
-    id: z.number().describe("ID of the suggested drink"),
-    name: z.string().describe("Name of the suggested drink"),
-    description: z.string().describe("Description of the suggested drink"),
-    reasoning: z.string().describe("Reasoning behind the suggested drink"),
-  }).optional().describe("Object containing the suggested drink"),
 })
 
 const model = new ChatOpenAI({
@@ -141,19 +135,25 @@ async function greetPatron(state: typeof GraphState.State) {
 async function getPatronInput(state: typeof GraphState.State) {
   console.log("Getting patron input...");
   const lastMessage = state.messages[state.messages.length - 1];
-
+  
   // If this is an AI message, interrupt for user input
   if (lastMessage instanceof AIMessage) {
-    const value = await interrupt(lastMessage.content);
-    console.log(`userMoods length: ${state.userMoods.length}: ${state.userMoods.join(", ")} \n drinkIngredients length: ${state.drinkIngredients.length}: ${state.drinkIngredients.join(", ")}`)
-    const nextGoto = state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal ? "makeRecommendation" : "questionPatron";
-    console.log(`Next goto: ${nextGoto}`)
-    return new Command({
-      goto: nextGoto,
-      update: {
-        messages: [...state.messages, value]
-      }
-    });
+    if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
+      return new Command({
+        goto: "makeRecommendation",
+        update: {
+          messages: [...state.messages]
+        }
+      });
+    } else {
+      const value = await interrupt(lastMessage.content);
+      return new Command({
+        goto: "questionPatron",
+        update: {
+          messages: [...state.messages, value]
+        }
+      });
+    }
   }
 }
 
@@ -172,7 +172,7 @@ async function questionPatron(state: typeof GraphState.State) {
 
       In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
       Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses and demeanor to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
-      
+
       CRITICAL RULES:
       * Always end your response with a question to prompt the patron to respond.
       * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
@@ -234,44 +234,35 @@ async function questionPatron(state: typeof GraphState.State) {
 
 async function makeRecommendation(state: typeof GraphState.State)  {
   console.log("Making recommendations...");
-  
+
   if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
     const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
     console.log("Drink recommendations:", drinkRecommendations);
-    
+
     // Get the best match drink
     const bestDrink = drinkRecommendations[0];
-    console.log(bestDrink)
-    const REC_SYS_PROMPT = `${SYSPROMPT}\n\n
-        PHASE 3:
-        I have analyzed the patron's preferences and found this drink:
-        ${JSON.stringify(bestDrink, null, 2)}
+    console.log(bestDrink);
 
-        Based on their mood (${state.userMoods.join(", ")}) and preferred ingredients (${state.drinkIngredients.join(", ")}), craft a response that:
-        1. Recommends this specific drink
-        2. Explains why it's perfect for them, referencing their stated preferences
-        3. Ends with a friendly goodbye
-
-        Response should be conversational and natural, not just listing facts.`
-
-    const messages = [
-      new SystemMessage(REC_SYS_PROMPT),
-      ...state.messages.slice(-2) // Only include the last exchange for context
-    ];
-    
     try {
-      const response = await model.invoke(messages);
       return new Command({
         goto: END,
         update: {
-          messages: [...state.messages, new AIMessage(response.response)],
+          messages: [...state.messages],
+          drinkSuggested: true,
+        }
+      });
+    } catch (error) {
+      console.error('Error getting LLM response:', error);
+      // Fallback message if LLM fails
+      const fallbackMessage = `I recommend the ${bestDrink.name}. It's the perfect match for your preferences!`;
+      return new Command({
+        goto: END,
+        update: {
+          messages: [...state.messages, new AIMessage(fallbackMessage)],
           drinkSuggested: true,
           drinkSuggestions: [bestDrink]
         }
       });
-    } catch (error) {
-      console.error('LangChain API error:', error);
-      throw error;
     }
   }
 }

@@ -13,6 +13,8 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   options?: string[];
+  moods?: string[];
+  preferences?: string[];
   drinkSuggestions?: {
     id: number;
     name: string;
@@ -168,7 +170,8 @@ export function ChatWindow({
                       <DrinkCard
                         key={drink.id}
                         name={drink.name}
-                        reasoning={drink.reasoning}
+                        ingredients={drink.description}
+                        tags=""
                         selected={drink.id === selectedDrinkId}
                         onSelect={() => handleDrinkSelect(drink.id)}
                       />

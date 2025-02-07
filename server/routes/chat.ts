@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ChatOpenAI } from "@langchain/openai";
 import { startConversation, config, graph} from '../lib/openai';
 import { Command} from "@langchain/langgraph";
 import { getWeather, getLocationFromIP, CustomLocation } from '../lib/weather';
@@ -6,7 +7,7 @@ import { db } from '@db';
 import { chatSessions, ingredients } from '@db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import { HumanMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 export const router = Router();
 
@@ -112,5 +113,34 @@ router.get('/ingredients', async (req, res) => {
     console.error('Error fetching ingredients:', error);
     console.error('Error details:', error instanceof Error ? error.message : error);
     res.status(500).json({ message: 'Failed to fetch ingredients' });
+  }
+});
+
+router.post('/drinks/rationale', async (req, res) => {
+  try {
+    const { name, ingredients, tags, moods, preferences } = req.body;
+    
+    const prompt = `You are a knowledgeable bartender explaining why this drink is perfect for the patron.
+    
+    Drink: ${name}
+    Ingredients: ${ingredients}
+    Characteristics: ${tags}
+    Their mood/vibe: ${moods?.join(', ')}
+    Their preferences: ${preferences?.join(', ')}
+    
+    Write a natural, friendly explanation of why this drink is perfect for them based on the above information.
+    Keep it concise but personalized.`;
+
+    const model = new ChatOpenAI({
+      modelName: "gpt-4",
+      temperature: 0.7
+    });
+
+    const response = await model.invoke([new SystemMessage(prompt)]);
+    
+    res.json({ rationale: response.content });
+  } catch (error) {
+    console.error('Error generating drink rationale:', error);
+    res.status(500).json({ message: 'Failed to generate drink rationale' });
   }
 });

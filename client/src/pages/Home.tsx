@@ -9,6 +9,12 @@ import { DrinkCard } from "@/components/DrinkCard";
 import { Martini, Settings, Info, History, ChevronLeft, ChevronRight } from "lucide-react";
 import type { SelectDrink } from "@db/schema";
 
+// Ensure SelectDrink has required properties
+interface DrinkWithDetails extends SelectDrink {
+  ingredients: string;
+  tags: string;
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string>();
@@ -16,7 +22,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const { data: selectedDrink } = useQuery<SelectDrink>({
+  const { data: selectedDrink } = useQuery<DrinkWithDetails>({
     queryKey: ['/api/drinks', sessionId],
     enabled: !!sessionId,
   });
@@ -109,7 +115,10 @@ export default function Home() {
           <ScrollArea className="h-[calc(100vh-8rem)]">
             <DrinkCard
               name={selectedDrink.name}
-              reasoning="Selected drink"
+              ingredients={selectedDrink.ingredients}
+              tags={selectedDrink.tags}
+              moods={messages.flatMap(m => m.moods || [])}
+              preferences={messages.flatMap(m => m.preferences || [])}
               selected
               onSelect={() => {}}
             />
