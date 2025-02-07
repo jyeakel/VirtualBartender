@@ -179,7 +179,7 @@ async function questionPatron(state: typeof GraphState.State) {
       * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
       * Do not use the word "ingredients" in more than one option for any option set
       * Do not use the word "ingredients" for an option where the patron wants you decide what to include in their drink (i.e., do not return options like: "surprise me with ingredients", "you choose the ingredients", etc.)
-      * Do not ask about drink preparation preferences or how the cocktail is served (e.g. "shaken or stirred?", "what type of glass do you prefer?")
+      * Do not ask about drink preparation or how the cocktail is served (e.g. don't ask "shaken or stirred?" or "what type of glass do you prefer?")
       * Do not ask about allergies or dietary restrictions
       * Do not ask about non-alcoholic or any non cocktail drinks, as we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
       * Do not suggest any specific cocktails at this phase
@@ -233,36 +233,42 @@ async function questionPatron(state: typeof GraphState.State) {
 }
 
 async function makeRecommendation(state: typeof GraphState.State)  {
-  // We'll instruct the model to ask user about mood/ingredients
   console.log("Making recommendations...");
   
   if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
-    console.log('do we get here?')
     const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
-    const REC_SYS_PROMPT = `${SYSPROMPT} \n\n
+    console.log("Drink recommendations:", drinkRecommendations);
+    
+    // Get the best match drink
+    const bestDrink = drinkRecommendations[0];
+    console.log(bestDrink)
+    const REC_SYS_PROMPT = `${SYSPROMPT}\n\n
         PHASE 3:
-        Suggest one drink from one of the options below to your patron:
-        ${drinkRecommendations}
+        I have analyzed the patron's preferences and found this drink:
+        ${JSON.stringify(bestDrink, null, 2)}
 
-        CRITICAL RULES:
-        * Always suggest a drink from the provided options
-        * Come up with an explanation for why this drink makes sense for them based on the information you know about them
-        * Say goodbye after you've made the recommendation
-        `
+        Based on their mood (${state.userMoods.join(", ")}) and preferred ingredients (${state.drinkIngredients.join(", ")}), craft a response that:
+        1. Recommends this specific drink
+        2. Explains why it's perfect for them, referencing their stated preferences
+        3. Ends with a friendly goodbye
+
+        Response should be conversational and natural, not just listing facts.`
+
     const messages = [
       new SystemMessage(REC_SYS_PROMPT),
-      ...state.messages
+      ...state.messages.slice(-2) // Only include the last exchange for context
     ];
+    
     try {
-      console.log(state.messages[state.messages.length - 1])
-    } catch (error) {
-      console.error('LangChain API error:', error);
-      throw error;
-    }
-    try {
-      console.log("Try response from recommendation node")
       const response = await model.invoke(messages);
-      console.log(response)
+      return new Command({
+        goto: END,
+        update: {
+          messages: [...state.messages, new AIMessage(response.response)],
+          drinkSuggested: true,
+          drinkSuggestions: [bestDrink]
+        }
+      });
     } catch (error) {
       console.error('LangChain API error:', error);
       throw error;
@@ -338,7 +344,6 @@ export async function startConversation(sessionId: string, weather: string, loca
 
 const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<string>) => {
   const query = `Ingredients: ${ingredients.join(", ")} Mood: ${moods.join(", ")}`
-  console.log("Search query for embeddings:", query);
   const embedding = await generateEmbedding(query);
   const similarity = sql<number>`1 - (${cosineDistance(embeddings.embedding, embedding)})`;
   const RecommendedDrinks = await db
@@ -346,6 +351,5 @@ const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<
     .from(embeddings)
     .orderBy((t) => desc(t.similarity))
     .limit(4);
-  console.log(RecommendedDrinks)
   return RecommendedDrinks;
 };
