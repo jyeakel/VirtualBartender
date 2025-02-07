@@ -9,24 +9,28 @@ import { DrinkCard } from "./DrinkCard";
 import { IngredientsSelector } from "./IngredientsSelector";
 import { stringToBytes } from "node_modules/uuid/dist/esm-browser/v35";
 
+interface DrinkSuggestion {
+  id: string;
+  name: string;
+  description: string;
+  moods: string[];
+  preferences: string[];
+}
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
   options?: string[];
   moods?: string[];
   preferences?: string[];
-  drinkSuggestions?: {
-    id: number;
-    name: string;
-    description: string;
-    reasoning: string;
-  }[];
+  drinkSuggestions?: DrinkSuggestion[];
 }
 
 interface ChatWindowProps {
   sessionId: string;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setSessionId: React.Dispatch<React.SetStateAction<string | undefined>>;
   onDrinkSelect?: (drinkId: number) => void;
 }
 
@@ -34,6 +38,7 @@ export function ChatWindow({
   sessionId, 
   messages, 
   setMessages,
+  setSessionId,
   onDrinkSelect 
 }: ChatWindowProps) {
   const [input, setInput] = useState("");
@@ -171,9 +176,11 @@ export function ChatWindow({
                         key={drink.id}
                         name={drink.name}
                         ingredients={drink.description}
+                        moods={drink.moods}
+                        preferences={drink.preferences}
                         tags=""
-                        selected={drink.id === selectedDrinkId}
-                        onSelect={() => handleDrinkSelect(drink.id)}
+                        selected={String(drink.id) === String(selectedDrinkId)}
+                        onSelect={() => handleDrinkSelect(parseInt(drink.id, 10))}
                       />
                     ))}
                   </div>
@@ -193,29 +200,84 @@ export function ChatWindow({
               )}
             </div>
           </ScrollArea>
-          <form onSubmit={handleSubmit} className="p-4 border-t border-gray-100">
-            <div className="flex gap-2">
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1"
-              />
-              {selectedIngredients.length > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowIngredients(true)}
-                >
-                  {selectedIngredients.length} {selectedIngredients.length === 1 ? "Ingredient" : "Ingredients"}
-                </Button>
-              )}
-              <Button type="submit" size="icon">
-                <Send className="h-4 w-4" />
+          <div className="p-4 border-t border-gray-100">
+            {messages.some(m => m.drinkSuggestions?.length) ? (
+              <Button 
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    // First, reset all local state
+                    setMessages([]);
+                    setSelectedDrinkId(undefined);
+                    setSelectedIngredients([]);
+                    setShowIngredients(false);
+                    setInput("");
+                    setSessionId(undefined);
+
+                    // Then start a new session
+                    const response = await fetch("/api/chat/start", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                    });
+
+                    if (!response.ok) {
+                      throw new Error("Failed to start new session");
+                    }
+
+                    const data = await response.json();
+                    // Set the initial greeting after state is cleared
+                    const initialMessage = {
+                      role: "assistant" as const,
+                      content: data.message,
+                      options: data.options || []
+                    };
+                    
+                    // Update with new session data
+                    setSessionId(data.sessionId);
+                    setMessages([initialMessage]);
+                    
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to start new session",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="w-full"
+              >
+                Start Over
               </Button>
-            </div>
-          </form>
+            ) : (
+              <form onSubmit={handleSubmit}>
+                <div className="flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1"
+                  />
+                  {selectedIngredients.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowIngredients(true)}
+                    >
+                      {selectedIngredients.length} {selectedIngredients.length === 1 ? "Ingredient" : "Ingredients"}
+                    </Button>
+                  )}
+                  <Button type="submit" size="icon">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
         </Card>
       </div>
       {showIngredients && (

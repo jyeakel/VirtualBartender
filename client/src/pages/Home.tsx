@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,8 @@ import type { SelectDrink } from "@db/schema";
 interface DrinkWithDetails extends SelectDrink {
   ingredients: string;
   tags: string;
+  moods: string[];
+  preferences: string[];
 }
 
 export default function Home() {
@@ -22,13 +24,27 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  const queryClient = useQueryClient();
   const { data: selectedDrink } = useQuery<DrinkWithDetails>({
     queryKey: ['/api/drinks', sessionId],
     enabled: !!sessionId,
   });
 
-  const startChat = async () => {
+  // Clear selected drink when session changes
+  useEffect(() => {
+    if (!sessionId) {
+      queryClient.removeQueries({ queryKey: ['/api/drinks', sessionId] });
+    }
+  }, [sessionId, queryClient]);
+
+  const resetChat = () => {
+    setMessages([]);
+    setSessionId(undefined);
     setIsLoading(true);
+  };
+
+  const startChat = async () => {
+    resetChat();
     try {
       const response = await fetch("/api/chat/start", {
         method: "POST",
@@ -71,6 +87,7 @@ export default function Home() {
               messages={messages} 
               setMessages={setMessages}
               sessionId={sessionId!}
+              setSessionId={setSessionId}
             />
           ) : (
             <Card className="h-full flex items-center justify-center bg-white">
@@ -117,8 +134,8 @@ export default function Home() {
               name={selectedDrink.name}
               ingredients={selectedDrink.ingredients}
               tags={selectedDrink.tags}
-              moods={messages.flatMap(m => m.moods || [])}
-              preferences={messages.flatMap(m => m.preferences || [])}
+              moods={selectedDrink.moods || []}
+              preferences={selectedDrink.preferences || []}
               selected
               onSelect={() => {}}
             />

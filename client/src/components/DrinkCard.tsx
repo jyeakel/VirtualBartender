@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +6,9 @@ interface DrinkCardProps {
   name: string;
   ingredients: string;
   tags: string;
-  moods?: string[];
-  preferences?: string[];
+  recipeUrl?: string;
+  moods?: string[] | string;
+  preferences?: string[] | string;
   selected?: boolean;
   onSelect: () => void;
 }
@@ -17,41 +17,48 @@ export function DrinkCard({
   name,
   ingredients,
   tags,
+  recipeUrl,
   moods,
   preferences,
   selected,
   onSelect 
 }: DrinkCardProps) {
   const [rationale, setRationale] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (selected) {
-      getRationale();
-    }
-  }, [selected]);
+    getRationale();
+  }, []);
 
   const getRationale = async () => {
     setLoading(true);
     try {
+      // Ensure arrays are properly handled
+      const parsedMoods = Array.isArray(moods) ? moods : 
+        (typeof moods === 'string' ? (moods as string).split(',').filter(Boolean) : []);
+      const parsedPrefs = Array.isArray(preferences) ? preferences :
+        (typeof preferences === 'string' ? (preferences as string).split(',').filter(Boolean) : []);
+
+      const payload = {
+        name,
+        ingredients,
+        tags,
+        moods: parsedMoods,
+        preferences: parsedPrefs
+      };
+      console.log("Sending rationale request with payload:", payload);
       const response = await fetch("/api/drinks/rationale", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name,
-          ingredients,
-          tags,
-          moods,
-          preferences
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
-      setRationale(data.rationale);
+      setRationale(data.rationale || "This drink perfectly matches your preferences!"); // Handle missing rationale
     } catch (error) {
       console.error("Failed to get drink rationale:", error);
-      setRationale("This drink perfectly matches your preferences!");
+      setRationale("This drink perfectly matches your preferences!"); // fallback
     } finally {
       setLoading(false);
     }
@@ -60,17 +67,29 @@ export function DrinkCard({
   return (
     <Card className={`transition-all duration-200 ${selected ? 'ring-2 ring-primary shadow-md' : 'hover:shadow-md'}`}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-semibold text-gray-900">{name}</CardTitle>
+        <CardTitle className="text-lg font-semibold text-gray-900">
+          {name}
+          {recipeUrl && (
+            <a 
+              href={recipeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-500 hover:text-blue-700 block mt-1"
+            >
+              View Recipe →
+            </a>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        {selected ? (
-          loading ? (
-            <p className="text-sm text-gray-600 mb-4">Getting personalized recommendation...</p>
-          ) : (
-            <p className="text-sm text-gray-600 mb-4">{rationale}</p>
-          )
+        {loading ? (
+          <div className="space-y-2 mb-4">
+            <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+            <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
+            <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3" />
+          </div>
         ) : (
-          <p className="text-sm text-gray-600 mb-4">Select this drink to see why it's perfect for you.</p>
+          <p className="text-sm text-gray-600 mb-4">{rationale}</p>
         )}
         <Button 
           onClick={onSelect}

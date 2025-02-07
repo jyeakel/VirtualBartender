@@ -21,6 +21,12 @@ export const router = Router();
  */
 router.post('/start', async (req, res) => {
   try {
+    // Delete any existing sessions and reset all state
+    await db.delete(chatSessions).where(sql`true`);
+    
+    // Reset the graph state before starting new conversation
+    config.state = undefined;
+    
     console.log('Starting new chat session...');
     const sessionId = uuidv4();
 
@@ -44,11 +50,11 @@ router.post('/start', async (req, res) => {
     // Start the conversation in openai.ts
     const response = await startConversation(sessionId, weatherInfo, locationInfo);
 
-    // Send initial welcome message
+    // Send initial welcome message with options
     res.json({
       sessionId,
-      // Return the last message in the chain
       message: response.messages[response.messages.length - 1].content,
+      options: (response.messages[response.messages.length - 1] as any).options || []
     });
   } catch (error) {
     console.error('Error starting chat:', error);
@@ -86,9 +92,30 @@ router.post('/message', async (req, res) => {
     const response = await graph.invoke(command, config);
 
     const lastMessage = response.messages[response.messages.length - 1];
+    // Ensure drink suggestions maintain their full context
+    // Define interface and ensure it matches the data structure
+    interface DrinkRecommendation {
+      id: number;
+      name: string;
+      description: string;
+      moods: string[];
+      preferences: string[];
+      reasoning?: string;
+    }
+
+    const drinkSuggestions = (response.drinkSuggestions as DrinkRecommendation[])?.map(drink => ({
+      id: Number(drink.id),
+      name: drink.name,
+      description: drink.description,
+      moods: drink.moods,
+      preferences: drink.preferences,
+      reasoning: drink.reasoning || ''
+    })) || [];
+
     res.json({
       message: lastMessage.content,
-      options: (lastMessage as any).options || []
+      options: (lastMessage as any).options || [],
+      drinkSuggestions
     });
   } catch (error) {
     console.error('Error processing message:', error);
@@ -118,18 +145,28 @@ router.get('/ingredients', async (req, res) => {
 
 router.post('/drinks/rationale', async (req, res) => {
   try {
-    const { name, ingredients, tags, moods, preferences } = req.body;
-    
-    const prompt = `You are a knowledgeable bartender explaining why this drink is perfect for the patron.
-    
-    Drink: ${name}
+    const { name, ingredients, tags, moods = [], preferences = [] } = req.body;
+
+    if (!moods.length || !preferences.length) {
+      return res.status(400).json({ 
+        rationale: "I need more information about your preferences to provide a personalized recommendation." 
+      });
+    }
+
+    const prompt = `You are a knowledgeable bartender providing a personalized drink recommendation.
+
+    THE DRINK:
+    Name: ${name}
     Ingredients: ${ingredients}
-    Characteristics: ${tags}
-    Their mood/vibe: ${moods?.join(', ')}
-    Their preferences: ${preferences?.join(', ')}
-    
-    Write a natural, friendly explanation of why this drink is perfect for them based on the above information.
-    Keep it concise but personalized.`;
+    Characteristics/Tags: ${tags}
+
+    THE PATRON:
+    Current Mood/Vibe: ${moods?.join(', ')}
+    Drink Preferences: ${preferences?.join(', ')}
+
+    Based on the SPECIFIC details above, explain why this exact drink is perfect for this patron. This should be three sentences max.
+    Reference their stated moods and preferences, and connect them to the drink's specific ingredients and characteristics.
+    Keep it natural and conversational, but make sure to highlight the direct connections between their preferences and the drink's qualities.`;
 
     const model = new ChatOpenAI({
       modelName: "gpt-4",
@@ -137,7 +174,7 @@ router.post('/drinks/rationale', async (req, res) => {
     });
 
     const response = await model.invoke([new SystemMessage(prompt)]);
-    
+
     res.json({ rationale: response.content });
   } catch (error) {
     console.error('Error generating drink rationale:', error);

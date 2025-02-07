@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
 import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt, Graph } from "@langchain/langgraph";
 import { CustomLocation, getWeather } from '../lib/weather';
-import { desc, sql, cosineDistance, l1Distance } from 'drizzle-orm';
+import { eq, desc, sql, cosineDistance, l1Distance } from 'drizzle-orm';
 import { db } from '@db';
-import { embeddings } from '@db/schema';
+import { embeddings, drinks } from '@db/schema';
 
 /**
  * 1) Define OpenAI details
@@ -93,7 +93,22 @@ const GraphState = Annotation.Root({
 // use MemorySaver to store the state of the chain
 const checkpointer = new MemorySaver();
 // set config so we can use checkpointing
-export const config = { configurable: { thread_id: "VirtualBartender" } };
+interface Config {
+  configurable: { thread_id: string };
+  state?: {
+    messages: BaseMessage[];
+    drinkSuggested: boolean;
+    drinkSuggestions: any[];
+    sessionId: string;
+    weather: string;
+    location: CustomLocation | null;
+    questionCount: number;
+    preferences: Set<string>;
+    moods: Set<string>;
+  };
+}
+
+export const config: Config = { configurable: { thread_id: "" } };
 
 
 /**
@@ -243,27 +258,14 @@ async function makeRecommendation(state: typeof GraphState.State)  {
     const bestDrink = drinkRecommendations[0];
     console.log(bestDrink);
 
-    try {
-      return new Command({
-        goto: END,
-        update: {
-          messages: [...state.messages],
-          drinkSuggested: true,
-        }
-      });
-    } catch (error) {
-      console.error('Error getting LLM response:', error);
-      // Fallback message if LLM fails
-      const fallbackMessage = `I recommend the ${bestDrink.name}. It's the perfect match for your preferences!`;
-      return new Command({
-        goto: END,
-        update: {
-          messages: [...state.messages, new AIMessage(fallbackMessage)],
-          drinkSuggested: true,
-          drinkSuggestions: [bestDrink]
-        }
-      });
-    }
+    return new Command({
+      goto: END,
+      update: {
+        messages: [...state.messages, new AIMessage("I have a drink recommendation for you...")],
+        drinkSuggested: true,
+        drinkSuggestions: [bestDrink]
+      }
+    });
   }
 }
 
@@ -297,7 +299,24 @@ export const graph = new StateGraph(GraphState)
 // Start the conversation
 export async function startConversation(sessionId: string, weather: string, location: CustomLocation | null) {
   console.log("Starting conversation with sessionId =", sessionId);
-
+  
+  // Use sessionId as unique thread_id
+  config.configurable = { thread_id: sessionId };
+  config.state = undefined;
+  
+  // Initialize fresh state
+  config.state = {
+    messages: [],
+    drinkSuggested: false,
+    drinkSuggestions: [],
+    sessionId,
+    weather,
+    location,
+    questionCount: 0,
+    preferences: new Set(),
+    moods: new Set()
+  };
+  
   const messages = [
     new SystemMessage(
       `${SYSPROMPT}\n\n
@@ -319,28 +338,53 @@ export async function startConversation(sessionId: string, weather: string, loca
   const response = await graph.invoke({messages: messages}, config)
 
   // Update the state with the user's location and weather for use in the initial welcome message
-  try {
-    await graph.updateState(config, {
-      userWeather: weather,
-      userLocation: location?.city + ", " + location?.regionname,
-      userTime: location?.time,
-    });
-  } catch (e) {}
-
   return {
     // return the AI's greeting message
     messages: response.messages,
   };
 }
 
-const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<string>) => {
+interface DrinkRecommendation {
+  id: number;
+  name: string;
+  description: string;
+  recipeUrl?: string;
+  moods: string[];
+  preferences: string[];
+  reasoning?: string;
+}
+
+const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<string>): Promise<DrinkRecommendation[]> => {
   const query = `Ingredients: ${ingredients.join(", ")} Mood: ${moods.join(", ")}`
   const embedding = await generateEmbedding(query);
   const similarity = sql<number>`1 - (${cosineDistance(embeddings.embedding, embedding)})`;
   const RecommendedDrinks = await db
-    .select({ id: embeddings.drinkId, name: embeddings.drinkName, ingredients: embeddings.ingredients, tags: embeddings.tags, similarity })
+    .select({ 
+      id: embeddings.drinkId, 
+      name: embeddings.drinkName, 
+      description: embeddings.ingredients, // Using ingredients as description
+      tags: embeddings.tags,
+      recipeUrl: drinks.recipeUrl,
+      similarity,
+      moods: sql<string[]>`ARRAY['${sql.raw(moods.join("','"))}']`,
+      preferences: sql<string[]>`ARRAY['${sql.raw(ingredients.join("','"))}']`
+    })
     .from(embeddings)
+    .leftJoin(drinks, eq(embeddings.drinkId, drinks.id))
     .orderBy((t) => desc(t.similarity))
     .limit(4);
-  return RecommendedDrinks;
+
+  // Add the user context to each drink and format according to interface
+  const drinksWithContext: DrinkRecommendation[] = RecommendedDrinks
+    .filter(drink => drink.id != null && drink.name != null)
+    .map(drink => ({
+      id: drink.id!,
+      name: drink.name!,
+      description: drink.description || '',
+      moods: moods,
+      preferences: ingredients.map(i => i.toString()),
+      reasoning: ''
+    }));
+  
+  return drinksWithContext;
 };
