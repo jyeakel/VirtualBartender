@@ -134,6 +134,7 @@ export default function Home() {
               name={selectedDrink.name}
               ingredients={selectedDrink.ingredients}
               tags={selectedDrink.tags}
+              recipeUrl={selectedDrink.recipeUrl}
               moods={selectedDrink.moods || []}
               preferences={selectedDrink.preferences || []}
               selected

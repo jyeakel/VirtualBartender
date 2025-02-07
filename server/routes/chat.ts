@@ -23,10 +23,10 @@ router.post('/start', async (req, res) => {
   try {
     // Delete any existing sessions and reset all state
     await db.delete(chatSessions).where(sql`true`);
-    
+
     // Reset the graph state before starting new conversation
     config.state = undefined;
-    
+
     console.log('Starting new chat session...');
     const sessionId = uuidv4();
 
@@ -98,19 +98,24 @@ router.post('/message', async (req, res) => {
       id: number;
       name: string;
       description: string;
+      reference: string | null;
       moods: string[];
       preferences: string[];
       reasoning?: string;
     }
 
-    const drinkSuggestions = (response.drinkSuggestions as DrinkRecommendation[])?.map(drink => ({
-      id: Number(drink.id),
-      name: drink.name,
-      description: drink.description,
-      moods: drink.moods,
-      preferences: drink.preferences,
-      reasoning: drink.reasoning || ''
-    })) || [];
+    const drinkSuggestions = (response.drinkSuggestions as DrinkRecommendation[])?.map(drink => {
+      console.log('Drink data from database:', drink);
+      return {
+        id: Number(drink.id),
+        name: drink.name,
+        description: drink.description,
+        reference: drink.reference || null,
+        moods: drink.moods,
+        preferences: drink.preferences,
+        reasoning: drink.reasoning || ''
+      };
+    }) || [];
 
     res.json({
       message: lastMessage.content,

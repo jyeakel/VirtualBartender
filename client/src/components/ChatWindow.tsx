@@ -13,6 +13,7 @@ interface DrinkSuggestion {
   id: string;
   name: string;
   description: string;
+  reference?: string | null;
   moods: string[];
   preferences: string[];
 }
@@ -178,6 +179,7 @@ export function ChatWindow({
                         ingredients={drink.description}
                         moods={drink.moods}
                         preferences={drink.preferences}
+                        reference={drink.reference || null}
                         tags=""
                         selected={String(drink.id) === String(selectedDrinkId)}
                         onSelect={() => handleDrinkSelect(parseInt(drink.id, 10))}

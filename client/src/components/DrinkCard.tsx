@@ -6,7 +6,7 @@ interface DrinkCardProps {
   name: string;
   ingredients: string;
   tags: string;
-  recipeUrl?: string;
+  reference: string | null;
   moods?: string[] | string;
   preferences?: string[] | string;
   selected?: boolean;
@@ -17,7 +17,7 @@ export function DrinkCard({
   name,
   ingredients,
   tags,
-  recipeUrl,
+  reference,
   moods,
   preferences,
   selected,
@@ -63,15 +63,14 @@ export function DrinkCard({
       setLoading(false);
     }
   };
-
   return (
     <Card className={`transition-all duration-200 ${selected ? 'ring-2 ring-primary shadow-md' : 'hover:shadow-md'}`}>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold text-gray-900">
           {name}
-          {recipeUrl && (
+          {reference && (
             <a 
-              href={recipeUrl}
+              href={reference}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-blue-500 hover:text-blue-700 block mt-1"
