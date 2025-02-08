@@ -58,7 +58,7 @@ export interface CustomLocation {
   time: string;
 }
 
-export async function getLocationFromIP(ip: string): Promise<CustomLocation | null> {
+export async function getLocationFromIP(ip: string | string[]): Promise<CustomLocation | null> {
   try {
     const response = await fetch(`http://ip-api.com/json/${ip}?fields=16888`);
     const data = await response.json();

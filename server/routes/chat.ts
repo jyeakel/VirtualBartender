@@ -31,19 +31,15 @@ router.post('/start', async (req, res) => {
     const sessionId = uuidv4();
 
     // get user location + weather
-    const clientIp = req.ip || req.socket.remoteAddress || '';
-    console.log(`req.ip: ${req.ip}`)
-    console.log(`req.socket.remoteAddress: ${req.socket.remoteAddress}`)
-    console.log(`req.socket.localAddress: ${req.socket.localAddress}`)
-    console.log(`req.headers['x-forwarded-for']: ${req.headers['x-forwarded-for']} `)
+    const clientIp = req.headers['x-forwarded-for'] || '';
     const locationInfo: CustomLocation | null = await getLocationFromIP(clientIp);
     let weatherInfo = '';
     if (locationInfo) {
       weatherInfo = await getWeather(locationInfo.lat, locationInfo.lon);
     }
 
-    console.log(`Location Info: ${locationInfo}`)
-    console.log(`Weather Info: ${weatherInfo}`)
+    console.log(`User Location: ${locationInfo}`)
+    console.log(`User Weather: ${weatherInfo}`)
 
     // Store session in DB
     await db.insert(chatSessions).values({
