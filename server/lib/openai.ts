@@ -2,21 +2,19 @@ import { ChatOpenAI } from "@langchain/openai";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { z } from 'zod';
 import { SystemMessage, HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
-import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt, Graph } from "@langchain/langgraph";
+import { Annotation, MemorySaver, MessagesAnnotation, START, END, StateGraph, Command, interrupt } from "@langchain/langgraph";
 import { CustomLocation, getWeather } from '../lib/weather';
 import { eq, desc, sql, cosineDistance, l1Distance } from 'drizzle-orm';
 import { db } from '@db';
 import { embeddings, drinks } from '@db/schema';
 
 /**
- * 1) Define OpenAI details
+ * 1) Define OpenAI details and other constants
  * - Create output schema for structured output using zod 
  * - Select chat and embedding models
- * - Draft the system prompt to be used throughout all nodes
+ * - Draft the system prompt to be used in all nodes
+ * - Set thresholds for user information
  */
-
-const moodTotal = 1;
-const ingredientTotal = 1;
 
 const outputSchema = z.object({
   response: z.string().describe("AIMessage response to the Human"),
@@ -52,6 +50,9 @@ When you are asking a straightforward question, provide exactly 3 options for th
   "message": "conversational response here",
   "options": ["Option 1", "Option 2", "..."],
 }`;
+
+const moodTotal = 2;
+const ingredientTotal = 2;
 
 /**
  * 2) Define graph state
@@ -92,7 +93,6 @@ const GraphState = Annotation.Root({
 
 // use MemorySaver to store the state of the chain
 const checkpointer = new MemorySaver();
-// set config so we can use checkpointing
 interface Config {
   configurable: { thread_id: string };
   state?: {
@@ -108,8 +108,8 @@ interface Config {
   };
 }
 
+// Use sessionID as thread to cleanly reset state between sessions
 export const config: Config = { configurable: { thread_id: "" } };
-
 
 /**
  * 3 ) Define graph nodes
@@ -173,7 +173,6 @@ async function getPatronInput(state: typeof GraphState.State) {
 }
 
 async function questionPatron(state: typeof GraphState.State) {
-  // We'll instruct the model to ask user about mood/ingredients
   console.log("Questioning patron...");
   
   const maxRetries = 3;
@@ -192,7 +191,7 @@ async function questionPatron(state: typeof GraphState.State) {
       In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
       Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses and demeanor to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
 
-      CRITICAL RULES:
+      CRITICAL RULES (MUST FOLLOW):
       * Always end your response with a question to prompt the patron to respond.
       * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
       * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
@@ -225,7 +224,7 @@ async function questionPatron(state: typeof GraphState.State) {
         return new Command({
           goto: "getPatronInput",
           update: {
-            messages: [...state.messages, new AIMessage("Interesting! Say more about that?")]
+            messages: [...state.messages, new AIMessage("This bar is rather noisy! Say that again?")]
           }
         });
       }
@@ -280,9 +279,7 @@ async function makeRecommendation(state: typeof GraphState.State)  {
     const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
     console.log("Drink recommendations:", drinkRecommendations);
 
-    // Get the best match drink
     const bestDrink = drinkRecommendations[0];
-    console.log(bestDrink);
 
     return new Command({
       goto: END,
@@ -302,22 +299,17 @@ export const graph = new StateGraph(GraphState)
   .addNode("questionPatron", questionPatron, {
     ends: ["getPatronInput"]
   })
-  // Node for interupting the conversation and gathering all user input
   .addNode("getPatronInput", getPatronInput, { 
     ends: ["questionPatron", "makeRecommendation"]
   })
   .addNode("makeRecommendation", makeRecommendation, {
     ends: [END]
   })
-
-// Basic edges for multi-turn
 .addEdge(START, "greetPatron")
 .addEdge("greetPatron", "getPatronInput")
 .addEdge("questionPatron", "getPatronInput")
 .addEdge("getPatronInput", "makeRecommendation")
 .addEdge("makeRecommendation", END)
-
-// compile graph
 .compile({
   checkpointer
 });
@@ -351,7 +343,7 @@ export async function startConversation(sessionId: string, weather: string, loca
 
       DO:
       * Make passing reference to exactly one of: (${location?.city}, ${location?.regionname}), weather situation (${weather}), or time of day ${location?.time}.
-      * Don't ask the patron about their mood or favorite drinks yet.
+      * Don't ask the patron about their mood or anything related to drinks yet.
 
       DO NOT:
       * Pretend that you are in the same physical space with them or live in their city (you are a virtual bartender).
@@ -381,7 +373,8 @@ interface DrinkRecommendation {
 }
 
 const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<string>): Promise<DrinkRecommendation[]> => {
-  const query = `Ingredients: ${ingredients.join(", ")} Mood: ${moods.join(", ")}`
+  const query = `Has ingredients: ${ingredients.join(", ")}; For these moods: ${moods.join(", ")}`
+  console.log(`Sending query to vector DB: ${query}`)
   const embedding = await generateEmbedding(query);
   const similarity = sql<number>`1 - (${cosineDistance(embeddings.embedding, embedding)})`;
   const RecommendedDrinks = await db
