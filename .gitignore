@@ -7,3 +7,4 @@ vite.config.ts.*
 .env
 *.code-workspace
 openai copy.ts
+attached_assets
