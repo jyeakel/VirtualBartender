@@ -38,6 +38,9 @@ router.post('/start', async (req, res) => {
       weatherInfo = await getWeather(locationInfo.lat, locationInfo.lon);
     }
 
+    console.log(`Location Info: ${locationInfo}`)
+    console.log(`Weather Info: ${weatherInfo}`)
+
     // Store session in DB
     await db.insert(chatSessions).values({
       sessionId,
