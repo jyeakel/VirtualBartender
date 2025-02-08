@@ -31,8 +31,7 @@ router.post('/start', async (req, res) => {
     const sessionId = uuidv4();
 
     // get user location + weather
-    // const clientIp = req.ip || req.socket.remoteAddress || '';
-    const clientIp = '67.245.228.183' // Example IP
+    const clientIp = req.ip || req.socket.remoteAddress || '';
     const locationInfo: CustomLocation | null = await getLocationFromIP(clientIp);
     let weatherInfo = '';
     if (locationInfo) {

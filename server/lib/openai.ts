@@ -175,8 +175,12 @@ async function getPatronInput(state: typeof GraphState.State) {
 async function questionPatron(state: typeof GraphState.State) {
   // We'll instruct the model to ask user about mood/ingredients
   console.log("Questioning patron...");
-
-  const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
+  
+  const maxRetries = 3;
+  let lastResponse = "";
+  
+  for (let attempts = 1; attempts <= maxRetries; attempts++) {
+    const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
       PHASE 2:
       (You can disregard the previous instructions that were given under the heading PHASE 1)
       Ask questions to determine the patron's personality, mood, target vibe, and taste preferences with the goal of finding the perfect cocktail for them. 
@@ -205,27 +209,39 @@ async function questionPatron(state: typeof GraphState.State) {
   ];
 
   try {
-    const response = await model.invoke(messages);
-    // discard the response and call model.invoke again if the response from the model is the same as the last user message
-    if (response.response === state.messages[state.messages.length - 1].content) {
-      console.log("Model response is the same as the last user message, retrying...");
-      return new Command({
-        goto: "questionPatron",
-      });
-    }  
-    try {
+      const messages = [
+        new SystemMessage(QUESTION_SYS_PROMPT),
+        ...state.messages
+      ];
+      
+      const response = await model.invoke(messages);
+      
+      if (response.response === state.messages[state.messages.length - 1].content) {
+        console.log("Model response is the same as the last user message, retrying...");
+        continue;
+      }
+      
+      if (response.response === lastResponse && attempts === maxRetries) {
+        return new Command({
+          goto: "getPatronInput",
+          update: {
+            messages: [...state.messages, new AIMessage("Interesting! Say more about that?")]
+          }
+        });
+      }
+      
+      lastResponse = response.response;
       const aiMessage = new AIMessage(response.response);
-      // Attach options to the message metadata
       (aiMessage as any).options = response.options;
 
-      // make all drink ingredients lowercase if it exists
       if (response.drinkIngredients) {
         response.drinkIngredients = response.drinkIngredients.map((ingredient: string) => ingredient.toLowerCase());
       }
-       // make all moods lowercase if it exists
+      
       if (response.moods) {
         response.moods = response.moods.map((mood: string) => mood.toLowerCase());
       }
+      
       return new Command({
         goto: "getPatronInput",
         update: {
@@ -234,17 +250,27 @@ async function questionPatron(state: typeof GraphState.State) {
           userMoods: response.moods
         }
       });
-    } catch (e) {
-      console.error("Some error occurred", e);
-      return {
-        messages: { role: "assistant", content: "I'm having trouble understanding you. Can you try again?" },
-        options: ["Start Over", "Try Different Approach"]
-      };
+      
+    } catch (error) {
+      console.error('Error in attempt', attempts, ':', error);
+      if (attempts === maxRetries) {
+        return new Command({
+          goto: "getPatronInput",
+          update: {
+            messages: [...state.messages, new AIMessage("I'm having trouble understanding you. Can you try again?")]
+          }
+        });
+      }
     }
-  } catch (error) {
-    console.error('LangChain API error:', error);
-    throw error;
   }
+  
+  // If all retries failed
+  return new Command({
+    goto: "getPatronInput",
+    update: {
+      messages: [...state.messages, new AIMessage("Interesting! Say more...")]
+    }
+  });
 }
 
 async function makeRecommendation(state: typeof GraphState.State)  {

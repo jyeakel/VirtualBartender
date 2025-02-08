@@ -10,7 +10,6 @@ interface DrinkCardProps {
   moods?: string[] | string;
   preferences?: string[] | string;
   selected?: boolean;
-  onSelect: () => void;
 }
 
 export function DrinkCard({ 
@@ -20,15 +19,14 @@ export function DrinkCard({
   reference,
   moods,
   preferences,
-  selected,
-  onSelect 
+  selected 
 }: DrinkCardProps) {
   const [rationale, setRationale] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getRationale();
-  }, []);
+  }, [name, ingredients, tags, JSON.stringify(moods), JSON.stringify(preferences)]);
 
   const getRationale = async () => {
     setLoading(true);
@@ -88,16 +86,8 @@ export function DrinkCard({
             <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3" />
           </div>
         ) : (
-          <p className="text-sm text-gray-600 mb-4">{rationale}</p>
+          <p className="text-sm text-gray-600">{rationale}</p>
         )}
-        <Button 
-          onClick={onSelect}
-          variant={selected ? "secondary" : "default"}
-          className="w-full"
-          size="sm"
-        >
-          {selected ? "Selected" : "Choose This Drink"}
-        </Button>
       </CardContent>
     </Card>
   );

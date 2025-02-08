@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Martini, Info, History, ChevronLeft, ChevronRight } from "lucide-react";
+import { Martini, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -39,16 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {!sidebarCollapsed && "Sidle Up"}
             </Button>
           </Link>
-          <Link href="/history">
-            <Button 
-              variant="ghost" 
-              className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium`}
-            >
-              <History className="h-4 w-4" />
-              {!sidebarCollapsed && "Recent Recs"}
-            </Button>
-          </Link>
-          
+
           <Link href="/about">
             <Button 
               variant="ghost" 

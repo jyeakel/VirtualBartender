@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send } from "lucide-react";
+import { Send, User, Martini } from "lucide-react";
 import { DrinkCard } from "./DrinkCard";
 import { IngredientsSelector } from "./IngredientsSelector";
 import { stringToBytes } from "node_modules/uuid/dist/esm-browser/v35";
@@ -139,57 +139,65 @@ export function ChatWindow({
           <ScrollArea className="flex-1 overflow-auto p-6" ref={scrollRef}>
             <div className="space-y-6">
               {messages.map((message, i) => (
-            <div
-              key={i}
-              className={`flex ${
-                message.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground ml-4"
-                    : "bg-gray-50 text-gray-900 mr-4"
-                }`}
-              >
-                <p className="whitespace-pre-wgit rap text-sm leading-relaxed font-medium">{message.content}</p>
-
-                {message.options && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {message.options.map((option, j) => (
-                      <Button
-                        key={j}
-                        variant="secondary"
-                        size="sm"
-                        className="bg-white hover:bg-gray-50 text-gray-900 font-medium"
-                        onClick={() => handleOptionClick(option)}
-                      >
-                        {option}
-                      </Button>
-                    ))}
+                <div
+                  key={i}
+                  className={`flex flex-col ${
+                    message.role === "user" ? "items-end" : "items-start"
+                  }`}
+                >
+                  <div className={`flex items-start gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                    {message.role === "assistant" ? (
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                        <Martini className="w-5 h-5 text-gray-600" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                        <User className="w-5 h-5 text-primary-foreground" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[90%] rounded-2xl px-4 py-3 ${
+                        message.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-gray-50 text-gray-900"
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium">{message.content}</p>
+                      {message.options && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {message.options.map((option, j) => (
+                            <Button
+                              key={j}
+                              variant="secondary"
+                              size="sm"
+                              className="bg-white hover:bg-gray-50 text-gray-900 font-medium"
+                              onClick={() => handleOptionClick(option)}
+                            >
+                              {option}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-
-                {message.drinkSuggestions && (
-                  <div className="mt-4 space-y-4">
-                    {message.drinkSuggestions.map((drink) => (
-                      <DrinkCard
-                        key={drink.id}
-                        name={drink.name}
-                        ingredients={drink.description}
-                        moods={drink.moods}
-                        preferences={drink.preferences}
-                        reference={drink.reference || null}
-                        tags=""
-                        selected={String(drink.id) === String(selectedDrinkId)}
-                        onSelect={() => handleDrinkSelect(parseInt(drink.id, 10))}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+                  {message.drinkSuggestions && (
+                    <div className="mt-4 space-y-4 max-w-[80%]">
+                      {message.drinkSuggestions.map((drink) => (
+                        <DrinkCard
+                          key={drink.id}
+                          name={drink.name}
+                          ingredients={drink.description}
+                          moods={drink.moods}
+                          preferences={drink.preferences}
+                          reference={drink.reference || null}
+                          tags=""
+                          selected={String(drink.id) === String(selectedDrinkId)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%] space-y-2 bg-gray-50 rounded-2xl p-4">

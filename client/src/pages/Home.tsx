@@ -124,25 +124,6 @@ export default function Home() {
           )}
         </main>
       </div>
-
-      {/* Right sidebar for selected drink - only shown when a drink is selected */}
-      {selectedDrink && (
-        <div className="w-80 bg-white border-l border-gray-200 p-4">
-          <h2 className="text-xl font-bold tracking-tight mb-4 text-gray-800">Selected Drink</h2>
-          <ScrollArea className="h-[calc(100vh-8rem)]">
-            <DrinkCard
-              name={selectedDrink.name}
-              ingredients={selectedDrink.ingredients}
-              tags={selectedDrink.tags}
-              recipeUrl={selectedDrink.recipeUrl}
-              moods={selectedDrink.moods || []}
-              preferences={selectedDrink.preferences || []}
-              selected
-              onSelect={() => {}}
-            />
-          </ScrollArea>
-        </div>
-      )}
     </div>
   );
 }
