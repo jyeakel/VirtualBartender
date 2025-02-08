@@ -35,6 +35,7 @@ router.post('/start', async (req, res) => {
     console.log(`req.ip: ${req.ip}`)
     console.log(`req.socket.remoteAddress: ${req.socket.remoteAddress}`)
     console.log(`req.socket.localAddress: ${req.socket.localAddress}`)
+    console.log(`req.headers['x-forwarded-for']: ${req.headers['x-forwarded-for']} `)
     const locationInfo: CustomLocation | null = await getLocationFromIP(clientIp);
     let weatherInfo = '';
     if (locationInfo) {
