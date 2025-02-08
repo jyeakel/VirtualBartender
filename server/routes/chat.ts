@@ -32,7 +32,9 @@ router.post('/start', async (req, res) => {
 
     // get user location + weather
     const clientIp = req.ip || req.socket.remoteAddress || '';
-    console.log(clientIp)
+    console.log(`req.ip: ${req.ip}`)
+    console.log(`req.socket.remoteAddress: ${req.socket.remoteAddress}`)
+    console.log(`req.socket.localAddress: ${req.socket.localAddress}`)
     const locationInfo: CustomLocation | null = await getLocationFromIP(clientIp);
     let weatherInfo = '';
     if (locationInfo) {
