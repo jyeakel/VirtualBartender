@@ -37,15 +37,13 @@ export default function Home() {
     }
   }, [sessionId, queryClient]);
 
-  const resetChat = () => {
-    setMessages([]);
-    setSessionId(undefined);
-    setIsLoading(true);
-  };
-
   const startChat = async () => {
-    resetChat();
+    setIsLoading(true);
     try {
+      // Reset state before starting new chat
+      setMessages([]);
+      setSessionId(undefined);
+
       const response = await fetch("/api/chat/start", {
         method: "POST",
         headers: {
@@ -88,6 +86,8 @@ export default function Home() {
               setMessages={setMessages}
               sessionId={sessionId!}
               setSessionId={setSessionId}
+              isLoading={isLoading}
+              setIsLoading={setIsLoading}
             />
           ) : (
             <Card className="h-full flex items-center justify-center bg-white">

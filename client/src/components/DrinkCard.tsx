@@ -25,10 +25,16 @@ export function DrinkCard({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getRationale();
-  }, [name, ingredients, tags, JSON.stringify(moods), JSON.stringify(preferences)]);
+    const key = `${name}-${ingredients}-${tags}-${JSON.stringify(moods)}-${JSON.stringify(preferences)}`;
+    getRationale(key);
+  }, [name, ingredients, tags]);
 
-  const getRationale = async () => {
+  const getRationale = async (key: string) => {
+    // Check if we already have a request in progress for this key
+    if ((getRationale as any).currentKey === key) {
+      return;
+    }
+    (getRationale as any).currentKey = key;
     setLoading(true);
     try {
       // Ensure arrays are properly handled

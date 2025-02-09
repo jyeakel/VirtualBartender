@@ -33,6 +33,8 @@ interface ChatWindowProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setSessionId: React.Dispatch<React.SetStateAction<string | undefined>>;
   onDrinkSelect?: (drinkId: number) => void;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
 }
 
 export function ChatWindow({ 
@@ -40,12 +42,13 @@ export function ChatWindow({
   messages, 
   setMessages,
   setSessionId,
-  onDrinkSelect 
+  onDrinkSelect,
+  isLoading,
+  setIsLoading
 }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [selectedDrinkId, setSelectedDrinkId] = useState<number>();
   const [showIngredients, setShowIngredients] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
