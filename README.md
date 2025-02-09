@@ -6,7 +6,7 @@ This is a simple project to gain familiarity with tools, methods, and workflows 
 
 ## Technologies, Tools, and Methods Used
 
-- **AI-Assisted Coding Tools**: [Replit](), [GitHub Copilot](), [ScrapeGraphAI]()
+- **AI-Assisted Coding Tools**: [Replit](https://replit.com/), [GitHub Copilot](https://github.com/features/copilot), [ScrapeGraphAI](https://scrapegraphai.com/)
 - **LLM**: [OpenAI Chat and Embedding APIs](https://platform.openai.com/docs/overview)
 - **LLM Orchestration**: [LangChain](https://js.langchain.com/docs/introduction/), [LangGraph](https://langchain-ai.github.io/langgraphjs/)
 - **Methods**: [Retrievel-Augmented Generation (RAG)](https://en.wikipedia.org/wiki/Retrieval-augmented_generation), [Human-in-the-loop workflows](https://js.langchain.com/docs/tutorials/sql_qa/#human-in-the-loop)
