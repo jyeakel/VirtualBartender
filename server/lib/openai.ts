@@ -51,7 +51,7 @@ When you are asking a straightforward question, provide exactly 3 options for th
   "options": ["Option 1", "Option 2", "..."],
 }`;
 
-const moodTotal = 2;
+const moodTotal = 1;
 const ingredientTotal = 2;
 
 /**
