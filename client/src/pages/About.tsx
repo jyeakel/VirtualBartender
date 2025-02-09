@@ -13,6 +13,9 @@ export default function About() {
           <p className="text-gray-600">
             Built with modern web technologies and an extensive drinks database to ensure you get the perfect drink recommendation every time.
           </p>
+          <p className="text-gray-600">
+            See the repository for Virtual Bartender on <a href="https://github.com/jyeakel/VirtualBartender/">GitHub</a>
+          </p>
         </CardContent>
       </Card>
     </div>

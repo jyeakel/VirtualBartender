@@ -292,6 +292,10 @@ async function makeRecommendation(state: typeof GraphState.State)  {
   }
 }
 
+/**
+ * 4 ) Build graph
+ */
+
 export const graph = new StateGraph(GraphState)
   .addNode("greetPatron", greetPatron, {
     ends: ["getPatronInput"]
@@ -313,6 +317,12 @@ export const graph = new StateGraph(GraphState)
 .compile({
   checkpointer
 });
+
+/**
+ * 5 ) Helper functions
+ * - Start conversation
+ * - Handle drink recommendation
+ */
 
 // Start the conversation
 export async function startConversation(sessionId: string, weather: string, location: CustomLocation | null) {
