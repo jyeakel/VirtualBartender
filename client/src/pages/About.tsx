@@ -10,11 +10,11 @@ export default function About() {
           <p className="text-gray-600 mb-4">
             Virtual Bartender is your AI-powered drink recommendation system. Get personalized cocktail suggestions based on your preferences and mood.
           </p>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mb-4">
             Built with modern web technologies and an extensive drinks database to ensure you get the perfect drink recommendation every time.
           </p>
           <p className="text-gray-600">
-            See the repository for Virtual Bartender on <a href="https://github.com/jyeakel/VirtualBartender/">GitHub</a>
+            See the repository for Virtual Bartender on <a className="text-blue-600 hover:text-blue-800 underline" href="https://github.com/jyeakel/VirtualBartender/">GitHub</a>
           </p>
         </CardContent>
       </Card>
