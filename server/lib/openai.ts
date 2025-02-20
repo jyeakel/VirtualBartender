@@ -26,8 +26,18 @@ const outputSchema = z.object({
 
 const model = new ChatOpenAI({
   modelName: "gpt-4",
-  temperature: 0.4
+  temperature: 0.6,
+  presencePenalty: 0.6,
+  frequencyPenalty: 0.5
 }).withStructuredOutput(outputSchema)
+
+// Helper to detect duplicate messages
+const isDuplicateMessage = (messages: BaseMessage[], newContent: string): boolean => {
+  if (messages.length < 2) return false;
+  const lastMessage = messages[messages.length - 1];
+  const previousMessage = messages[messages.length - 2];
+  return lastMessage.content === newContent || previousMessage.content === newContent;
+};
 
 const query_embedding = new OpenAIEmbeddings({
   modelName: "text-embedding-ada-002"
@@ -215,9 +225,14 @@ async function questionPatron(state: typeof GraphState.State) {
       
       const response = await model.invoke(messages);
       
-      if (response.response === state.messages[state.messages.length - 1].content) {
-        console.log("Model response is the same as the last user message, retrying...");
-        continue;
+      if (isDuplicateMessage(state.messages, response.response)) {
+        console.log("Detected duplicate response, retrying...");
+        if (attempts === maxRetries) {
+          response.response = "I apologize, but I need to better understand what you're looking for. Could you rephrase that?";
+          response.options = ["Tell me about your mood", "Describe your taste", "Start over"];
+        } else {
+          continue;
+        }
       }
       
       if (response.response === lastResponse && attempts === maxRetries) {
