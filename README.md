@@ -1,4 +1,4 @@
-# Virtual Bartender
+# VirtualBartender
 
 Chat with a virtual bartender and get a drink recommendation tailored to your mood and preferences.
 
