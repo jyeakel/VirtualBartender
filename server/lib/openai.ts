@@ -56,6 +56,8 @@ Below you will be given specific instructions for each phase of the conversation
 IMPORTANT: Respond with valid JSON in the following format. 
 When you are asking a straightforward question, provide exactly 3 options for the patron to choose from, keep them declarative, under 30 characters in length, no punctuation.
 
+"CRITICAL RULE: Never include questions in the options field. The options field is exclusively for user response options, not for you to ask questions."
+
 {
   "message": "conversational response here",
   "options": ["Option 1", "Option 2", "..."],
