@@ -231,7 +231,7 @@ async function questionPatron(state: typeof GraphState.State) {
         console.log("Detected duplicate response, retrying...");
         if (attempts === maxRetries) {
           response.response = "I apologize, but I need to better understand what you're looking for. Could you rephrase that?";
-          response.options = ["Tell me about your mood", "Describe your taste", "Start over"];
+          response.options = ["I need a drink recommendation", "Start over"];
         } else {
           continue;
         }
