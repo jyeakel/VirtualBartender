@@ -38,7 +38,7 @@ router.post('/start', async (req, res) => {
       weatherInfo = await getWeather(locationInfo.lat, locationInfo.lon);
     }
 
-    console.log(`User Location: ${locationInfo}`)
+    console.log(`User Location: ${locationInfo?.regionname}`)
     console.log(`User Weather: ${weatherInfo}`)
 
     // Store session in DB

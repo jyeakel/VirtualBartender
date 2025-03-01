@@ -54,7 +54,7 @@ You help the patron find the perfect drink for any occasion based on your conver
 Below you will be given specific instructions for each phase of the conversation.
 
 IMPORTANT: Respond with valid JSON in the following format. 
-When you are asking a straightforward question, provide exactly 3 options for the patron to choose from, keep them declarative, under 30 characters in length, no punctuation.
+When you are asking a straightforward question, provide exactly 3 options for a response for the patron to choose from, keep them declarative (never questions), under 30 characters in length, no punctuation.
 
 "CRITICAL RULE: Never include questions in the options field. The options field is exclusively for user response options, not for you to ask questions."
 
@@ -192,19 +192,16 @@ async function questionPatron(state: typeof GraphState.State) {
   
   for (let attempts = 1; attempts <= maxRetries; attempts++) {
     const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
-      PHASE 2:
-      (You can disregard the previous instructions that were given under the heading PHASE 1)
-      Ask questions to determine the patron's personality, mood, target vibe, and taste preferences with the goal of finding the perfect cocktail for them. 
-      Prompt them with questions that  tell you something about their mood and drink/flavor preferences, and read between the lines of their tone to assess mood.
-      Make absolutely certain you follow the CRITICAL RULES below for every response.
-
-      Ask about whatever you know less about. Right now you know ${state.drinkIngredients.length} things about ingredients, and ${state.userMoods.length} things about the patron's mood or vibe.
+      PHASE 2 (disregard instructions from PHASE 1):
+      Ask questions to determine the patron's mood, target vibe, and taste preferences with the goal of finding the perfect cocktail for them. 
+      Prompt them with questions that tell you something about their mood and drink/flavor preferences, and read between the lines of their tone to assess mood.
 
       In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
       Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses and demeanor to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
 
       CRITICAL RULES (MUST FOLLOW):
       * Always end your response with a question to prompt the patron to respond.
+      * The options should never be questions, only declarative responses to a question raised in the message.
       * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
       * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
       * Do not use the word "ingredients" in more than one option for any option set
@@ -293,6 +290,8 @@ async function makeRecommendation(state: typeof GraphState.State)  {
   console.log("Making recommendations...");
 
   if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
+    console.log("User moods:", state.userMoods);
+    console.log("User ingredients:", state.drinkIngredients);
     const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
     console.log("Drink recommendations:", drinkRecommendations);
 
@@ -368,14 +367,11 @@ export async function startConversation(sessionId: string, weather: string, loca
       PHASE 1:
       For the first message in the conversation, just welcome the patron in a warm and inviting manner and making a sentence or two of small talk.
 
-      DO:
+      CRITICAL RULES (MUST FOLLOW):
       * Make passing reference to exactly one of: (${location?.city}, ${location?.regionname}), weather situation (${weather}), or time of day ${location?.time}.
       * Don't ask the patron about their mood or anything related to drinks yet.
-
-      DO NOT:
-      * Pretend that you are in the same physical space with them or live in their city (you are a virtual bartender).
-      * Directly say the temperature or time unless it is especially notable
-      * Provide options related to drinks or ingredients. 
+      * Don't pretend that you are in the same physical space with them or live in their city (you are a virtual bartender).
+      * Don't directly say the temperature or time unless it is especially notable
       `),
     new HumanMessage("Hello"),
   ]
