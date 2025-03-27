@@ -1,3 +1,4 @@
+
 import { ChatOpenAI } from "@langchain/openai";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { z } from 'zod';
@@ -26,9 +27,9 @@ const outputSchema = z.object({
 
 const model = new ChatOpenAI({
   modelName: "gpt-4",
-  temperature: 0.6,
+  temperature: 0.7,
   presencePenalty: 0.6,
-  frequencyPenalty: 0.5
+  frequencyPenalty: 0.6
 }).withStructuredOutput(outputSchema)
 
 // Helper to detect duplicate messages
@@ -49,6 +50,8 @@ const generateEmbedding = async (query: string): Promise<number[]> => {
   return embedding;
 }; 
 
+let currentSessionwithRecommendation: string | null = null
+
 const SYSPROMPT = `You are a friendly and knowledgeable virtual bartender interacting with a patron.
 You help the patron find the perfect drink for any occasion based on your conversation with them and other context you have. 
 Below you will be given specific instructions for each phase of the conversation.
@@ -64,7 +67,7 @@ When you are asking a straightforward question, provide exactly 3 options for a 
 }`;
 
 const moodTotal = 1;
-const ingredientTotal = 2;
+const ingredientTotal = 1;
 
 /**
  * 2) Define graph state
@@ -135,8 +138,7 @@ async function greetPatron(state: typeof GraphState.State) {
     try {
       const response = await model.invoke([state.messages[0]]);
       return new Command({
-        goto:
-          "getPatronInput",
+        goto: "questionPatron",
         update: {
           messages: [...state.messages, new AIMessage(response.response)],
           userWeather: state.userWeather,
@@ -146,7 +148,7 @@ async function greetPatron(state: typeof GraphState.State) {
       if (attempts === maxRetries) {
         console.error("Max retry attempts reached:", e);
         return new Command({
-          goto: "getPatronInput",
+          goto: "questionPatron",
           update: {
             messages: [...state.messages, new AIMessage("Hi! I'd be happy to help you find the perfect drink today. What brings you in?")],
             userWeather: state.userWeather,
@@ -159,88 +161,71 @@ async function greetPatron(state: typeof GraphState.State) {
   }
 }
 
-async function getPatronInput(state: typeof GraphState.State) {
-  console.log("Getting patron input...");
-  const lastMessage = state.messages[state.messages.length - 1];
-  
-  // If this is an AI message, interrupt for user input
-  if (lastMessage instanceof AIMessage) {
-    if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
-      return new Command({
-        goto: "makeRecommendation",
-        update: {
-          messages: [...state.messages]
-        }
-      });
-    } else {
-      const value = await interrupt(lastMessage.content);
-      return new Command({
-        goto: "questionPatron",
-        update: {
-          messages: [...state.messages, value]
-        }
-      });
-    }
-  }
-}
-
 async function questionPatron(state: typeof GraphState.State) {
   console.log("Questioning patron...");
   
+  // Check if we have enough information to make a recommendation
+  if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
+    return new Command({
+      goto: "makeRecommendation",
+      update: {
+        messages: [...state.messages]
+      }
+    });
+  }
+  
+  // Get user input if the last message is from the AI
+  const lastMessage = state.messages[state.messages.length - 1];
+  if (lastMessage instanceof AIMessage) {
+    const userInput = await interrupt(lastMessage.content) as HumanMessage;
+    // Add user input to messages and continue to process it
+    state = {
+      ...state,
+      messages: [...state.messages, userInput]
+    };
+  }
+  
+  // Process the latest user input and generate AI response
   const maxRetries = 3;
   let lastResponse = "";
   
   for (let attempts = 1; attempts <= maxRetries; attempts++) {
-    const QUESTION_SYS_PROMPT = `${SYSPROMPT}\n\n
-      PHASE 2 (disregard instructions from PHASE 1):
-      Ask questions to determine the patron's mood, target vibe, and taste preferences with the goal of finding the perfect cocktail for them. 
-      Prompt them with questions that tell you something about their mood and drink/flavor preferences, and read between the lines of their tone to assess mood.
+    const QUESTION_SYS_PROMPT = `
+      PHASE 2 (Forget PHASE 1 instructions:
+      As the virtual bartender, ask questions to determine the patron's mood, target vibe, and taste preferences all with the goal of finding the perfect cocktail for them. 
+      Your questions should lead them to tell you something about their mood and drink/flavor preferences, and you should read between the lines of their tone to assess mood.
 
       In your JSON formatted responses, include two additional fields: "moods" and "ingredients" to store the patron's responses.
       Only add ingredients that they specifically mention in their response, but for moods, you should interpret their responses and demeanor to add one-word descriptors (e.g., "morose", "relaxed", "energetic")
 
       CRITICAL RULES (MUST FOLLOW):
       * Always end your response with a question to prompt the patron to respond.
+      * Keep the conversation focused on cocktails and the patron's mood and preferences with relation to cocktails.
       * The options should never be questions, only declarative responses to a question raised in the message.
       * If and only if your question to the patron is is specifically about ingredients in the cocktail, always include the option "I'll pick the ingredients".
-      * Do not include an option about picking ingredients if your question is not specifically asking about ingredients.
-      * Do not use the word "ingredients" in more than one option for any option set
-      * Do not use the word "ingredients" for an option where the patron wants you decide what to include in their drink (i.e., do not return options like: "surprise me with ingredients", "you choose the ingredients", etc.)
+      * Do not ever say or suggest you have all the information to suggest a drink 
       * Do not ask about drink preparation or how the cocktail is served (e.g. don't ask "shaken or stirred?" or "what type of glass do you prefer?")
       * Do not ask about allergies or dietary restrictions
       * Do not ask about non-alcoholic or any non cocktail drinks, as we won't be recommending those (If they ask for a non-alcoholic drink, just say you're a bartender specializing in cocktails)
-      * Do not suggest any specific cocktails at this phase
       `
-  const messages = [
-    new SystemMessage(QUESTION_SYS_PROMPT),
-    ...state.messages
-  ];
-
-  try {
+    try {
       const messages = [
         new SystemMessage(QUESTION_SYS_PROMPT),
         ...state.messages
       ];
       
       const response = await model.invoke(messages);
+      console.log("Response from model:", response);
+      console.log("Mood:", state.userMoods);
       
       if (isDuplicateMessage(state.messages, response.response)) {
         console.log("Detected duplicate response, retrying...");
         if (attempts === maxRetries) {
           response.response = "I apologize, but I need to better understand what you're looking for. Could you rephrase that?";
-          response.options = ["I need a drink recommendation", "Start over"];
+          response.options = ["I need a drink recommendation", "Oh, nevermind...", "Goodbye"];
         } else {
           continue;
         }
-      }
-      
-      if (response.response === lastResponse && attempts === maxRetries) {
-        return new Command({
-          goto: "getPatronInput",
-          update: {
-            messages: [...state.messages, new AIMessage("This bar is rather noisy! Say that again?")]
-          }
-        });
       }
       
       lastResponse = response.response;
@@ -255,8 +240,9 @@ async function questionPatron(state: typeof GraphState.State) {
         response.moods = response.moods.map((mood: string) => mood.toLowerCase());
       }
       
+      // Return to self to continue the conversation loop until we have enough information
       return new Command({
-        goto: "getPatronInput",
+        goto: "questionPatron",
         update: {
           messages: [...state.messages, aiMessage],
           drinkIngredients: response.drinkIngredients,
@@ -268,7 +254,7 @@ async function questionPatron(state: typeof GraphState.State) {
       console.error('Error in attempt', attempts, ':', error);
       if (attempts === maxRetries) {
         return new Command({
-          goto: "getPatronInput",
+          goto: "questionPatron",
           update: {
             messages: [...state.messages, new AIMessage("I'm having trouble understanding you. Can you try again?")]
           }
@@ -279,7 +265,7 @@ async function questionPatron(state: typeof GraphState.State) {
   
   // If all retries failed
   return new Command({
-    goto: "getPatronInput",
+    goto: "questionPatron",
     update: {
       messages: [...state.messages, new AIMessage("Interesting! Say more...")]
     }
@@ -289,7 +275,10 @@ async function questionPatron(state: typeof GraphState.State) {
 async function makeRecommendation(state: typeof GraphState.State)  {
   console.log("Making recommendations...");
 
-  if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal) {
+  if (state.userMoods.length > moodTotal && state.drinkIngredients.length > ingredientTotal && currentSessionwithRecommendation == null) {
+    console.log("Current session upon entering:", currentSessionwithRecommendation);
+    currentSessionwithRecommendation = config.configurable.thread_id;
+    console.log("Current session:", currentSessionwithRecommendation);
     console.log("User moods:", state.userMoods);
     console.log("User ingredients:", state.drinkIngredients);
     const drinkRecommendations = await getDrinkRecommendations(state.drinkIngredients, state.userMoods)
@@ -314,21 +303,17 @@ async function makeRecommendation(state: typeof GraphState.State)  {
 
 export const graph = new StateGraph(GraphState)
   .addNode("greetPatron", greetPatron, {
-    ends: ["getPatronInput"]
+    ends: ["questionPatron"]
   })
   .addNode("questionPatron", questionPatron, {
-    ends: ["getPatronInput"]
-  })
-  .addNode("getPatronInput", getPatronInput, { 
-    ends: ["questionPatron", "makeRecommendation"]
+    ends: ["makeRecommendation"]
   })
   .addNode("makeRecommendation", makeRecommendation, {
     ends: [END]
   })
 .addEdge(START, "greetPatron")
-.addEdge("greetPatron", "getPatronInput")
-.addEdge("questionPatron", "getPatronInput")
-.addEdge("getPatronInput", "makeRecommendation")
+.addEdge("greetPatron", "questionPatron")
+.addEdge("questionPatron", "makeRecommendation")
 .addEdge("makeRecommendation", END)
 .compile({
   checkpointer
@@ -367,11 +352,12 @@ export async function startConversation(sessionId: string, weather: string, loca
       PHASE 1:
       For the first message in the conversation, just welcome the patron in a warm and inviting manner and making a sentence or two of small talk.
 
+      At the patron's location, (${location?.city}, ${location?.regionname}), the weather is (${weather}), and the time is ${location?.time}.
+
       CRITICAL RULES (MUST FOLLOW):
-      * Make passing reference to exactly one of: (${location?.city}, ${location?.regionname}), weather situation (${weather}), or time of day ${location?.time}.
+      * Don't simply state the time, temperature, or weather, but rather make a passing reference to it in a natural way (e.g., "...beautiful clear morning in Tulsa...").
       * Don't ask the patron about their mood or anything related to drinks yet.
       * Don't pretend that you are in the same physical space with them or live in their city (you are a virtual bartender).
-      * Don't directly say the temperature or time unless it is especially notable
       `),
     new HumanMessage("Hello"),
   ]
