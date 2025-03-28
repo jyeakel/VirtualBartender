@@ -375,7 +375,7 @@ interface DrinkRecommendation {
   id: number;
   name: string;
   description: string;
-  reference: string | null;
+  recipe_url: string | null;
   moods: string[];
   preferences: string[];
   reasoning?: string;
@@ -392,7 +392,7 @@ const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<
       name: embeddings.drinkName, 
       description: embeddings.ingredients, // Using ingredients as description
       tags: embeddings.tags,
-      reference: drinks.reference,
+      recipe_url: drinks.recipeUrl,
       similarity,
       moods: sql<string[]>`ARRAY['${sql.raw(moods.join("','"))}']`,
       preferences: sql<string[]>`ARRAY['${sql.raw(ingredients.join("','"))}']`
@@ -409,7 +409,7 @@ const getDrinkRecommendations = async (ingredients: Array<String>, moods: Array<
       id: drink.id!,
       name: drink.name!,
       description: drink.description || '',
-      reference: drink.reference || null,
+      recipe_url: drink.recipe_url || null,
       moods: moods,
       preferences: ingredients.map(i => i.toString()),
       reasoning: ''

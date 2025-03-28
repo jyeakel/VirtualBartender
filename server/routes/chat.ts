@@ -100,7 +100,7 @@ router.post('/message', async (req, res) => {
       id: number;
       name: string;
       description: string;
-      reference: string | null;
+      recipe_url: string | null;
       moods: string[];
       preferences: string[];
       reasoning?: string;
@@ -112,7 +112,7 @@ router.post('/message', async (req, res) => {
         id: Number(drink.id),
         name: drink.name,
         description: drink.description,
-        reference: drink.reference || null,
+        recipe_url: drink.recipe_url || null,
         moods: drink.moods,
         preferences: drink.preferences,
         reasoning: drink.reasoning || ''

@@ -6,7 +6,7 @@ interface DrinkCardProps {
   name: string;
   ingredients: string;
   tags: string;
-  reference: string | null;
+  recipeUrl: string | null;
   moods?: string[] | string;
   preferences?: string[] | string;
   selected?: boolean;
@@ -16,7 +16,7 @@ export function DrinkCard({
   name,
   ingredients,
   tags,
-  reference,
+  recipeUrl,
   moods,
   preferences,
   selected 
@@ -72,9 +72,9 @@ export function DrinkCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold text-gray-900">
           {name}
-          {reference && (
+          {recipeUrl && (
             <a 
-              href={reference}
+              href={`https://kindredcocktails.com${recipeUrl}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-blue-500 hover:text-blue-700 block mt-1"

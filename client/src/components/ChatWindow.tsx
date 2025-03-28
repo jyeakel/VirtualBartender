@@ -13,7 +13,7 @@ interface DrinkSuggestion {
   id: string;
   name: string;
   description: string;
-  reference?: string | null;
+  recipe_url: string | null;
   moods: string[];
   preferences: string[];
 }
@@ -192,7 +192,7 @@ export function ChatWindow({
                           ingredients={drink.description}
                           moods={drink.moods}
                           preferences={drink.preferences}
-                          reference={drink.reference || null}
+                          recipeUrl={drink.recipe_url || null}
                           tags=""
                           selected={String(drink.id) === String(selectedDrinkId)}
                         />
@@ -246,11 +246,11 @@ export function ChatWindow({
                       content: data.message,
                       options: data.options || []
                     };
-                    
+
                     // Update with new session data
                     setSessionId(data.sessionId);
                     setMessages([initialMessage]);
-                    
+
                   } catch (error) {
                     toast({
                       title: "Error",
