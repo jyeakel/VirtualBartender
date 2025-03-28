@@ -87,6 +87,7 @@ export function DrinkCard({
       <CardContent>
         {loading ? (
           <div className="space-y-2 mb-4">
+            <p className="text-sm text-gray-500 animate-pulse">Getting personalized recommendation...</p>
             <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
             <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
             <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3" />

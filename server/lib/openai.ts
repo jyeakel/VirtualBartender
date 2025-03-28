@@ -329,6 +329,9 @@ export const graph = new StateGraph(GraphState)
 export async function startConversation(sessionId: string, weather: string, location: CustomLocation | null) {
   console.log("Starting conversation with sessionId =", sessionId);
   
+  // Reset session state
+  currentSessionwithRecommendation = null;
+  
   // Use sessionId as unique thread_id
   config.configurable = { thread_id: sessionId };
   config.state = undefined;
