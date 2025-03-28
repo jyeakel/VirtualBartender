@@ -58,9 +58,9 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on port 2800
-  // this serves both the API and the client
-  const PORT = 2800;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
+  const port = process.env.PORT || 2800;
+  // Listen on `port` and 0.0.0.0
+  server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
   });
 })();
