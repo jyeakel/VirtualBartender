@@ -57,8 +57,8 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 8080
-  const port = process.env.PORT || 8080;
+  // ALWAYS serve the app on port 2800
+  const port = process.env.PORT || 2800;
   // Listen on `port` and 0.0.0.0
   server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
